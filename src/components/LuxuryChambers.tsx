@@ -1,42 +1,13 @@
 import { ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const chambers = [
-  {
-    title: "Fine Jewellery",
-    subtitle: "925 Sterling Silver & Gold",
-    gradient: "from-primary/20 to-lavender/30",
-    emoji: "💎",
-  },
-  {
-    title: "Lab Grown Diamonds",
-    subtitle: "Certified Brilliance",
-    gradient: "from-teal-light/30 to-lavender/20",
-    emoji: "✨",
-  },
-  {
-    title: "Royal Apparel",
-    subtitle: "Kapde Fit for Royalty",
-    gradient: "from-lavender/30 to-primary/20",
-    emoji: "👑",
-  },
-  {
-    title: "Streetwear",
-    subtitle: "Urban Empire Collection",
-    gradient: "from-muted to-teal-soft",
-    emoji: "🔥",
-  },
-  {
-    title: "Traditional Wear",
-    subtitle: "Heritage & Grace",
-    gradient: "from-primary/15 to-white-gold-bright/30",
-    emoji: "🪷",
-  },
-  {
-    title: "Custom Watches",
-    subtitle: "Time, Redefined",
-    gradient: "from-teal-light/20 to-primary/15",
-    emoji: "⌚",
-  },
+  { title: "Fine Jewellery", subtitle: "925 Sterling Silver & Gold", gradient: "from-primary/20 to-lavender/30", emoji: "💎", slug: "fine-jewellery" },
+  { title: "Lab Grown Diamonds", subtitle: "Certified Brilliance", gradient: "from-teal-light/30 to-lavender/20", emoji: "✨", slug: "lab-diamonds" },
+  { title: "Royal Apparel", subtitle: "Kapde Fit for Royalty", gradient: "from-lavender/30 to-primary/20", emoji: "👑", slug: "royal-apparel" },
+  { title: "Streetwear", subtitle: "Urban Empire Collection", gradient: "from-muted to-teal-soft", emoji: "🔥", slug: "streetwear" },
+  { title: "Traditional Wear", subtitle: "Heritage & Grace", gradient: "from-primary/15 to-white-gold-bright/30", emoji: "🪷", slug: "traditional-wear" },
+  { title: "Custom Watches", subtitle: "Time, Redefined", gradient: "from-teal-light/20 to-primary/15", emoji: "⌚", slug: "custom-watches" },
 ];
 
 const LuxuryChambers = () => {
@@ -53,24 +24,22 @@ const LuxuryChambers = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {chambers.map((chamber, i) => (
-            <a
+            <Link
               key={chamber.title}
-              href="#"
+              to={`/collections/${chamber.slug}`}
               className="group relative overflow-hidden rounded-lg border border-white-gold-bright/40 p-8 lg:p-10 bg-gradient-to-br transition-all duration-500 hover:shadow-[var(--shadow-gold)] hover:scale-[1.02] animate-fade-up"
               style={{ animationDelay: `${i * 0.1}s` }}
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${chamber.gradient} opacity-50 group-hover:opacity-80 transition-opacity duration-500`} />
               <div className="relative z-10">
                 <span className="text-4xl mb-4 block">{chamber.emoji}</span>
-                <h3 className="font-display text-xl lg:text-2xl font-semibold text-foreground mb-1">
-                  {chamber.title}
-                </h3>
+                <h3 className="font-display text-xl lg:text-2xl font-semibold text-foreground mb-1">{chamber.title}</h3>
                 <p className="font-body text-sm text-muted-foreground mb-6">{chamber.subtitle}</p>
                 <span className="inline-flex items-center gap-2 font-body text-xs font-semibold tracking-widest uppercase text-foreground/70 group-hover:text-foreground transition-colors">
                   Enter Chamber <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                 </span>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { Crown, ArrowDown } from "lucide-react";
-import heroImage from "@/assets/hero-lion.jpg";
+import heroImage from "@/assets/hero-lion.png";
 
 const HeroSection = () => {
   return (

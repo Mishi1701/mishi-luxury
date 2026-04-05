@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Menu, X, ShoppingBag, Crown } from "lucide-react";
-import mishiLogo from "@/assets/mishi-logo.png";
+import mishiLogo from "@/assets/mishi-logo.jpg";
 
 const navLinks = [
   { label: "Fine Jewellery", href: "#jewellery" },

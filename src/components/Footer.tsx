@@ -1,5 +1,5 @@
 import { Crown, Instagram, Mail, Phone } from "lucide-react";
-import mishiLogo from "@/assets/mishi-logo.png";
+import mishiLogo from "@/assets/mishi-logo.jpg";
 
 const Footer = () => {
   return (

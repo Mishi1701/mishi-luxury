@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, X, ShoppingBag, ChevronDown } from "lucide-react";
+import { Menu, X, ShoppingBag, ChevronDown, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import mishiLogo from "@/assets/mishi-logo.jpg";
 
@@ -72,6 +72,9 @@ const Navbar = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
+            <Link to="/login" className="p-2 text-foreground/70 hover:text-foreground transition-colors">
+              <User className="w-5 h-5" />
+            </Link>
             <Link to="/cart" className="relative p-2 text-foreground/70 hover:text-foreground transition-colors">
               <ShoppingBag className="w-5 h-5" />
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">0</span>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, X, ShoppingBag, ChevronDown } from "lucide-react";
+import { Menu, X, ShoppingBag, ChevronDown, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import mishiLogo from "@/assets/mishi-logo.jpg";
 

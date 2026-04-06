@@ -1,7 +1,10 @@
 import { useParams, Link } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ArrowLeft, Filter, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Filter, ShoppingBag, Box } from "lucide-react";
+
+const ProductViewer3D = lazy(() => import("@/components/ProductViewer3D"));
 
 const collectionData: Record<string, { title: string; subtitle: string; description: string; gradient: string; products: { name: string; price: string; tag?: string }[] }> = {
   "fine-jewellery": {

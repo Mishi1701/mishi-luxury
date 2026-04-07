@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ArrowLeft, Filter, ShoppingBag, Box } from "lucide-react";

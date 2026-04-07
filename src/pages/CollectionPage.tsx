@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ArrowLeft, Filter, ShoppingBag, Box } from "lucide-react";
@@ -95,6 +95,45 @@ const collectionData: Record<string, { title: string; subtitle: string; descript
   },
 };
 
+const Viewer3DSection = () => {
+  const [show3D, setShow3D] = useState(false);
+  return (
+    <section className="py-12 border-b border-border/50">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          {show3D ? (
+            <Suspense fallback={<div className="aspect-square bg-muted/30 rounded-lg animate-pulse" />}>
+              <ProductViewer3D />
+            </Suspense>
+          ) : (
+            <button
+              onClick={() => setShow3D(true)}
+              className="aspect-square rounded-lg bg-gradient-to-b from-lavender/20 to-background flex flex-col items-center justify-center gap-4 border border-border/50 hover:border-primary/30 transition-colors"
+            >
+              <Box className="w-12 h-12 text-primary/50" />
+              <span className="font-body text-sm font-semibold text-foreground">Tap to Load 3D Viewer</span>
+              <span className="font-body text-[10px] text-muted-foreground tracking-wider uppercase">Interactive Experience</span>
+            </button>
+          )}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Box className="w-4 h-4 text-primary" />
+              <span className="font-body text-xs tracking-[0.2em] uppercase text-muted-foreground">Interactive 3D Preview</span>
+            </div>
+            <h3 className="font-display text-2xl font-bold text-foreground mb-3">Experience It in 3D</h3>
+            <p className="font-body text-sm text-muted-foreground leading-relaxed mb-4">
+              Rotate, zoom, and explore our signature pieces in stunning 3D detail. Every facet, every curve, every gleam — as if it were in your hands.
+            </p>
+            <p className="font-body text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+              Drag to rotate • Scroll to zoom • Pinch on mobile
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const CollectionPage = () => {
   const { slug } = useParams();
   const collection = collectionData[slug || ""];
@@ -140,30 +179,9 @@ const CollectionPage = () => {
         </div>
       </div>
 
-      {/* 3D Viewer Showcase */}
+      {/* 3D Viewer Showcase - Only loads when user clicks */}
       {(slug === "fine-jewellery" || slug === "lab-diamonds") && (
-        <section className="py-12 border-b border-border/50">
-          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-              <Suspense fallback={<div className="aspect-square bg-muted/30 rounded-lg animate-pulse" />}>
-                <ProductViewer3D />
-              </Suspense>
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Box className="w-4 h-4 text-royal-glow" />
-                  <span className="font-body text-xs tracking-[0.2em] uppercase text-muted-foreground">Interactive 3D Preview</span>
-                </div>
-                <h3 className="font-display text-2xl font-bold text-foreground mb-3">Experience It in 3D</h3>
-                <p className="font-body text-sm text-muted-foreground leading-relaxed mb-4">
-                  Rotate, zoom, and explore our signature pieces in stunning 3D detail. Every facet, every curve, every gleam — as if it were in your hands.
-                </p>
-                <p className="font-body text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
-                  Drag to rotate • Scroll to zoom • Pinch on mobile
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <Viewer3DSection />
       )}
 
       {/* Products Grid */}

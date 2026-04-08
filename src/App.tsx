@@ -5,7 +5,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
+import { CartProvider } from "@/hooks/useCart";
 import Index from "./pages/Index";
+const SlideOutCart = lazy(() => import("./components/SlideOutCart"));
 
 const CollectionPage = lazy(() => import("./pages/CollectionPage"));
 const DastaanPage = lazy(() => import("./pages/DastaanPage"));
@@ -34,6 +36,7 @@ const PageLoader = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <CartProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -54,9 +57,11 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <StyleExpertChat />
+            <SlideOutCart />
           </Suspense>
         </BrowserRouter>
       </TooltipProvider>
+      </CartProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Menu, X, ShoppingBag, ChevronDown, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import mishiLogo from "@/assets/mishi-logo.jpg";
+import { useCart } from "@/hooks/useCart";
 
 const collections = [
   { label: "Fine Jewellery", path: "/collections/fine-jewellery" },
@@ -22,6 +23,7 @@ const navLinks = [
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showCollections, setShowCollections] = useState(false);
+  const { totalItems, openCart } = useCart();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-white-gold-bright/50">
@@ -75,10 +77,12 @@ const Navbar = () => {
             <Link to="/login" className="p-2 text-foreground/70 hover:text-foreground transition-colors">
               <User className="w-5 h-5" />
             </Link>
-            <Link to="/cart" className="relative p-2 text-foreground/70 hover:text-foreground transition-colors">
+            <button onClick={openCart} className="relative p-2 text-foreground/70 hover:text-foreground transition-colors">
               <ShoppingBag className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">0</span>
-            </Link>
+              {totalItems > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">{totalItems}</span>
+              )}
+            </button>
             <button
               className="lg:hidden p-2 text-foreground/70"
               onClick={() => setIsOpen(!isOpen)}

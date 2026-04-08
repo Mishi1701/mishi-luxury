@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import { ArrowLeft, Filter, ShoppingBag, Box } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { useCart } from "@/hooks/useCart";
 
 const ProductViewer3D = lazy(() => import("@/components/ProductViewer3D"));
 
@@ -87,6 +88,7 @@ const CollectionPage = () => {
   const meta = collectionMeta[slug || ""];
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addItem } = useCart();
 
   useEffect(() => {
     if (!meta) return;
@@ -181,7 +183,10 @@ const CollectionPage = () => {
                   <div className="p-4">
                     <h3 className="font-display text-sm font-semibold text-foreground line-clamp-1">{product.name}</h3>
                     <p className="font-body text-sm font-bold text-foreground mt-1">{formatPrice(product.price)}</p>
-                    <button className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-primary/10 text-foreground font-body text-xs font-semibold tracking-wider uppercase rounded hover:bg-primary/20 transition-colors">
+                    <button
+                      onClick={() => addItem({ id: product.id, name: product.name, price: product.price, image_url: product.image_url, category: product.category })}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-primary/10 text-foreground font-body text-xs font-semibold tracking-wider uppercase rounded hover:bg-primary/20 transition-colors"
+                    >
                       <ShoppingBag className="w-3.5 h-3.5" /> Add to Cart
                     </button>
                   </div>

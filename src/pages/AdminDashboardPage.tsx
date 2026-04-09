@@ -262,6 +262,64 @@ const AdminDashboardPage = () => {
                     </select>
                   </div>
                 </div>
+
+                {/* Media Upload Section */}
+                <div className="border-t border-border/50 pt-4">
+                  <h4 className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-3 flex items-center gap-2">
+                    <Upload className="w-3.5 h-3.5" /> Upload Media
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Photo Upload */}
+                    <div>
+                      <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-2 block">Product Photo</label>
+                      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f, "image"); }} />
+                      {editProduct.image_url ? (
+                        <div className="relative group">
+                          <img src={editProduct.image_url} alt="Product" className="w-full h-32 object-cover rounded-lg border border-border" />
+                          <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                            <button onClick={() => imageInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md font-body text-xs font-semibold">Replace</button>
+                            <button onClick={() => setEditProduct({ ...editProduct, image_url: null })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md font-body text-xs font-semibold">Remove</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => imageInputRef.current?.click()}
+                          disabled={uploadingImage}
+                          className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors disabled:opacity-50"
+                        >
+                          {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <ImageIcon className="w-5 h-5 text-muted-foreground" />}
+                          <span className="font-body text-xs text-muted-foreground">{uploadingImage ? "Uploading..." : "Click to upload photo"}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Video Upload */}
+                    <div>
+                      <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-2 block">Product Video</label>
+                      <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f, "video"); }} />
+                      {(editProduct as any).video_url ? (
+                        <div className="relative group">
+                          <video src={(editProduct as any).video_url} className="w-full h-32 object-cover rounded-lg border border-border" muted />
+                          <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                            <button onClick={() => videoInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md font-body text-xs font-semibold">Replace</button>
+                            <button onClick={() => setEditProduct({ ...editProduct, video_url: null })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md font-body text-xs font-semibold">Remove</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => videoInputRef.current?.click()}
+                          disabled={uploadingVideo}
+                          className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors disabled:opacity-50"
+                        >
+                          {uploadingVideo ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Video className="w-5 h-5 text-muted-foreground" />}
+                          <span className="font-body text-xs text-muted-foreground">{uploadingVideo ? "Uploading..." : "Click to upload video"}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="font-body text-[10px] text-muted-foreground mt-2">Supported: JPG, PNG, WebP for photos • MP4, MOV, WebM for videos</p>
+                </div>
+
                 <button onClick={handleSaveProduct} className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-body text-xs font-bold tracking-wider uppercase rounded-md shimmer">
                   <Save className="w-3.5 h-3.5" /> {editProduct.id ? "Update Product" : "Add Product"}
                 </button>

@@ -17,6 +17,7 @@ const CartPage = lazy(() => import("./pages/CartPage"));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const MemberDashboardPage = lazy(() => import("./pages/MemberDashboardPage"));
+const OrderTrackingPage = lazy(() => import("./pages/OrderTrackingPage"));
 const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="/cart" element={<CartPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/orders/:orderId" element={<OrderTrackingPage />} />
               <Route path="/dashboard" element={<MemberDashboardPage />} />
               <Route path="/admin" element={<AdminLoginPage />} />
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />

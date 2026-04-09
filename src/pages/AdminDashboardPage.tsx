@@ -57,37 +57,55 @@ const AdminDashboardPage = () => {
     if (data) setOrders(data);
   };
 
+  const handleUploadFile = async (file: File, type: "image" | "video") => {
+    const setter = type === "image" ? setUploadingImage : setUploadingVideo;
+    setter(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${type}s/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("product-media").upload(path, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+      const url = urlData.publicUrl;
+      if (type === "image") {
+        setEditProduct((p) => p ? { ...p, image_url: url } : p);
+      } else {
+        setEditProduct((p) => p ? { ...p, video_url: url } : p);
+      }
+      toast({ title: `${type === "image" ? "Photo" : "Video"} uploaded 👑` });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setter(false);
+    }
+  };
+
   const handleSaveProduct = async () => {
     if (!editProduct?.name || !editProduct?.price || !editProduct?.category) {
       toast({ title: "Missing fields", variant: "destructive" });
       return;
     }
 
+    const payload = {
+      name: editProduct.name,
+      price: editProduct.price,
+      category: editProduct.category,
+      description: editProduct.description,
+      tag: editProduct.tag,
+      status: editProduct.status || "active",
+      image_url: editProduct.image_url,
+      video_url: (editProduct as any).video_url || null,
+    };
+
     if (editProduct.id) {
-      const { error } = await supabase.from("products").update({
-        name: editProduct.name,
-        price: editProduct.price,
-        category: editProduct.category,
-        description: editProduct.description,
-        tag: editProduct.tag,
-        status: editProduct.status || "active",
-        image_url: editProduct.image_url,
-      }).eq("id", editProduct.id);
+      const { error } = await supabase.from("products").update(payload).eq("id", editProduct.id);
       if (error) {
         toast({ title: "Error updating", description: error.message, variant: "destructive" });
       } else {
         toast({ title: "Product updated 👑" });
       }
     } else {
-      const { error } = await supabase.from("products").insert({
-        name: editProduct.name,
-        price: editProduct.price,
-        category: editProduct.category,
-        description: editProduct.description,
-        tag: editProduct.tag,
-        status: editProduct.status || "active",
-        image_url: editProduct.image_url,
-      });
+      const { error } = await supabase.from("products").insert(payload);
       if (error) {
         toast({ title: "Error adding", description: error.message, variant: "destructive" });
       } else {

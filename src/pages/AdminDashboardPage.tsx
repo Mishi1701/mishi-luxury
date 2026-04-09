@@ -27,8 +27,12 @@ const AdminDashboardPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Tables<"orders">[]>([]);
-  const [editProduct, setEditProduct] = useState<Partial<Product> | null>(null);
+  const [editProduct, setEditProduct] = useState<Partial<Product & { video_url?: string | null }> | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 

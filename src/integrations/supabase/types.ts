@@ -71,6 +71,7 @@ export type Database = {
           status: string
           tag: string | null
           updated_at: string
+          video_url: string | null
         }
         Insert: {
           category: string
@@ -83,6 +84,7 @@ export type Database = {
           status?: string
           tag?: string | null
           updated_at?: string
+          video_url?: string | null
         }
         Update: {
           category?: string
@@ -95,6 +97,7 @@ export type Database = {
           status?: string
           tag?: string | null
           updated_at?: string
+          video_url?: string | null
         }
         Relationships: []
       }

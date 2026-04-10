@@ -21,8 +21,8 @@ const RoyalDastaan = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12 animate-fade-up delay-100">
           {/* The King */}
           <div className="glass-card rounded-xl p-8 text-center group hover:shadow-[var(--shadow-gold)] transition-shadow duration-500">
-            <div className="w-40 h-40 mx-auto mb-6 rounded-full overflow-hidden border-4 border-primary/40 shadow-lg group-hover:border-primary transition-colors duration-500">
-              <img src={kingAvatar} alt="The King" className="w-full h-full object-cover" loading="lazy" width={512} height={768} />
+            <div className="w-36 h-52 mx-auto mb-6 rounded-2xl overflow-hidden border-4 border-primary/40 shadow-lg group-hover:border-primary transition-colors duration-500">
+              <img src={kingAvatar} alt="Mohit Gujrati — The King" className="w-full h-full object-cover" loading="eager" fetchPriority="high" decoding="async" width={288} height={416} />
             </div>
             <div className="flex items-center justify-center gap-2 mb-3">
               <Crown className="w-5 h-5 text-royal-glow" />
@@ -32,19 +32,15 @@ const RoyalDastaan = () => {
               <MapPin className="w-3.5 h-3.5 text-accent-foreground" />
               <span className="font-body text-xs text-muted-foreground tracking-wider uppercase">Madhya Pradesh</span>
             </div>
-            <p className="font-body text-sm text-muted-foreground leading-relaxed">
-              Born in the heart of India, raised with the roar of a lion. He carries fire in his eyes 
-              and gold in his hands. A self-made visionary who doesn't follow trends — he commands them. 
-              Every ring he crafts, every stone he sets, every thread he approves carries his uncompromising 
-              standard. His word is hallmarked. His craft is certified. His love? Eternal. He promised her 
-              the world — and then he built one.
+            <p className="font-body text-sm text-muted-foreground leading-relaxed italic">
+              "I am Mohit Gujrati. I am not a jeweller, I am an architect of a dream. 'Mishi' is my devotion—a promise of royalty and unconditional love built for Shrimati Ji, where every path we create together is paved with honour."
             </p>
           </div>
 
           {/* Shrimati Ji */}
           <div className="glass-card rounded-xl p-8 text-center group hover:shadow-[var(--shadow-gold)] transition-shadow duration-500">
-            <div className="w-40 h-40 mx-auto mb-6 rounded-full overflow-hidden border-4 border-secondary/60 shadow-lg group-hover:border-secondary transition-colors duration-500">
-              <img src={shrimatiAvatar} alt="Shrimati Ji" className="w-full h-full object-cover" loading="lazy" width={512} height={768} />
+            <div className="w-36 h-52 mx-auto mb-6 rounded-2xl overflow-hidden border-4 border-secondary/60 shadow-lg group-hover:border-secondary transition-colors duration-500">
+              <img src={shrimatiAvatar} alt="Shivani — Shrimati Ji" className="w-full h-full object-cover" loading="eager" fetchPriority="high" decoding="async" width={288} height={416} />
             </div>
             <div className="flex items-center justify-center gap-2 mb-3">
               <Sparkles className="w-5 h-5 text-royal-glow" />
@@ -54,12 +50,8 @@ const RoyalDastaan = () => {
               <MapPin className="w-3.5 h-3.5 text-accent-foreground" />
               <span className="font-body text-xs text-muted-foreground tracking-wider uppercase">Jharkhand</span>
             </div>
-            <p className="font-body text-sm text-muted-foreground leading-relaxed">
-              The grace behind the throne. The lioness whose quiet elegance speaks louder than any crown. 
-              From the mineral-rich lands of Jharkhand, she carries within her the strength of the earth 
-              and the softness of moonlight. She is the compass of taste, the curator of beauty, and the 
-              soul of every collection. Her eye for perfection transforms metal into emotion, stones into 
-              stories. The empire breathes because she believes.
+            <p className="font-body text-sm text-muted-foreground leading-relaxed italic">
+              "I am Shivani. I am the soul of 'Mishi'—the warmth behind every detail, the grace in every gesture. For me, true luxury is felt, not flaunted. It's an act of love where every guest is treated as a sovereign member of our eternal empire."
             </p>
           </div>
         </div>

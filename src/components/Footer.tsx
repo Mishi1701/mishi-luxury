@@ -1,8 +1,17 @@
 import { Crown, Instagram, Mail, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import mishiLogo from "@/assets/mishi-logo.jpg";
+import { useSiteContent, type Socials } from "@/hooks/useSiteContent";
+
+const SOCIAL_DEFAULTS: Socials = {
+  instagram: "https://instagram.com/mishiofficial1701",
+  email: "mishiofficial1701@gmail.com",
+  phone: "+91 0000000000",
+};
 
 const Footer = () => {
+  const { content: socials } = useSiteContent<Socials>("socials", SOCIAL_DEFAULTS);
+
   return (
     <footer className="bg-foreground text-background/80 pt-16 pb-8">
       <div className="container mx-auto px-4">
@@ -39,10 +48,11 @@ const Footer = () => {
               <Link to="/policies" className="font-body text-sm text-background/50 hover:text-background transition-colors">Privacy Policy</Link>
             </div>
             <div className="flex items-center gap-4">
-              <a href="#" className="text-background/50 hover:text-background transition-colors"><Instagram className="w-5 h-5" /></a>
-              <a href="#" className="text-background/50 hover:text-background transition-colors"><Mail className="w-5 h-5" /></a>
-              <a href="#" className="text-background/50 hover:text-background transition-colors"><Phone className="w-5 h-5" /></a>
+              <a href={socials.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="text-background/50 hover:text-background transition-colors"><Instagram className="w-5 h-5" /></a>
+              <a href={`mailto:${socials.email}`} aria-label="Email" className="text-background/50 hover:text-background transition-colors"><Mail className="w-5 h-5" /></a>
+              <a href={`tel:${socials.phone.replace(/\s/g, "")}`} aria-label="Phone" className="text-background/50 hover:text-background transition-colors"><Phone className="w-5 h-5" /></a>
             </div>
+            <p className="font-body text-[11px] text-background/40 mt-4">{socials.email}</p>
           </div>
         </div>
 

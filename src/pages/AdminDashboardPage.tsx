@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Crown, Package, Users, Settings, Edit3, Image, DollarSign, BarChart3, LogOut, Plus, Trash2, Save, Eye, ShoppingBag, FileText, Shield, X, Upload, Video, ImageIcon, Loader2 } from "lucide-react";
+import { Crown, Package, Users, Settings, Edit3, Image as ImageIcon, DollarSign, BarChart3, LogOut, Plus, Trash2, Save, Eye, ShoppingBag, FileText, Shield, X, Upload, Video, Loader2, Sparkles, Star, MessageSquare, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -8,16 +8,17 @@ import mishiLogo from "@/assets/mishi-logo.jpg";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Product = Tables<"products">;
+type Review = Tables<"reviews">;
+type Order = Tables<"orders">;
 
 const tabs = [
   { id: "overview", label: "Overview", icon: BarChart3 },
   { id: "products", label: "Products", icon: Package },
+  { id: "reviews", label: "Reviews", icon: Star },
   { id: "orders", label: "Orders", icon: ShoppingBag },
   { id: "content", label: "Content", icon: Edit3 },
-  { id: "media", label: "Media", icon: Image },
-  { id: "users", label: "Users", icon: Users },
   { id: "policies", label: "Policies", icon: FileText },
-  { id: "settings", label: "Settings", icon: Settings },
+  { id: "users", label: "Users", icon: Users },
 ];
 
 const categories = ["Fine Jewellery", "Lab Diamonds", "Royal Apparel", "Streetwear", "Traditional Wear", "Custom Watches"];
@@ -26,25 +27,33 @@ const AdminDashboardPage = () => {
   const { user, isAdmin, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Tables<"orders">[]>([]);
-  const [editProduct, setEditProduct] = useState<Partial<Product & { video_url?: string | null }> | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [editProduct, setEditProduct] = useState<Partial<Product> | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [generatingDesc, setGeneratingDesc] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Site content state
+  const [hero, setHero] = useState({ title: "", subtitle: "" });
+  const [socials, setSocials] = useState({ instagram: "", email: "", phone: "" });
+  const [policies, setPolicies] = useState({ delivery: "", returns: "", privacy: "" });
+  const [savingContent, setSavingContent] = useState(false);
+
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
-      navigate("/admin");
-    }
+    if (!loading && (!user || !isAdmin)) navigate("/admin");
   }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
     fetchProducts();
     fetchOrders();
+    fetchReviews();
+    fetchContent();
   }, []);
 
   const fetchProducts = async () => {
@@ -57,6 +66,29 @@ const AdminDashboardPage = () => {
     if (data) setOrders(data);
   };
 
+  const fetchReviews = async () => {
+    const { data } = await supabase.from("reviews").select("*").order("created_at", { ascending: false });
+    if (data) setReviews(data);
+  };
+
+  const fetchContent = async () => {
+    const { data } = await supabase.from("site_content").select("*");
+    data?.forEach((row) => {
+      const c = row.content as any;
+      if (row.section_key === "hero") setHero({ title: c.title || "", subtitle: c.subtitle || "" });
+      if (row.section_key === "socials") setSocials({ instagram: c.instagram || "", email: c.email || "", phone: c.phone || "" });
+      if (row.section_key === "policies") setPolicies({ delivery: c.delivery || "", returns: c.returns || "", privacy: c.privacy || "" });
+    });
+  };
+
+  const saveContent = async (key: string, content: object) => {
+    setSavingContent(true);
+    const { error } = await supabase.from("site_content").upsert([{ section_key: key, content: content as any }], { onConflict: "section_key" });
+    setSavingContent(false);
+    if (error) toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    else toast({ title: "Saved 👑", description: "Live on website now." });
+  };
+
   const handleUploadFile = async (file: File, type: "image" | "video") => {
     const setter = type === "image" ? setUploadingImage : setUploadingVideo;
     setter(true);
@@ -66,18 +98,31 @@ const AdminDashboardPage = () => {
       const { error } = await supabase.storage.from("product-media").upload(path, file);
       if (error) throw error;
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
-      const url = urlData.publicUrl;
-      if (type === "image") {
-        setEditProduct((p) => p ? { ...p, image_url: url } : p);
-      } else {
-        setEditProduct((p) => p ? { ...p, video_url: url } : p);
-      }
+      setEditProduct((p) => p ? { ...p, [type === "image" ? "image_url" : "video_url"]: urlData.publicUrl } : p);
       toast({ title: `${type === "image" ? "Photo" : "Video"} uploaded 👑` });
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
-    } finally {
-      setter(false);
+    } finally { setter(false); }
+  };
+
+  const generateAIDescription = async () => {
+    if (!editProduct?.name || !editProduct?.category) {
+      toast({ title: "Add name & category first", variant: "destructive" });
+      return;
     }
+    setGeneratingDesc(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-description", {
+        body: { name: editProduct.name, category: editProduct.category, keywords: editProduct.tag },
+      });
+      if (error) throw error;
+      if (data?.description) {
+        setEditProduct({ ...editProduct, description: data.description });
+        toast({ title: "AI Description ready ✨" });
+      }
+    } catch (err: any) {
+      toast({ title: "AI failed", description: err.message, variant: "destructive" });
+    } finally { setGeneratingDesc(false); }
   };
 
   const handleSaveProduct = async () => {
@@ -85,56 +130,52 @@ const AdminDashboardPage = () => {
       toast({ title: "Missing fields", variant: "destructive" });
       return;
     }
-
     const payload = {
-      name: editProduct.name,
-      price: editProduct.price,
-      category: editProduct.category,
-      description: editProduct.description,
-      tag: editProduct.tag,
+      name: editProduct.name, price: editProduct.price, category: editProduct.category,
+      description: editProduct.description, tag: editProduct.tag,
       status: editProduct.status || "active",
-      image_url: editProduct.image_url,
-      video_url: (editProduct as any).video_url || null,
+      image_url: editProduct.image_url, video_url: editProduct.video_url || null,
     };
-
-    if (editProduct.id) {
-      const { error } = await supabase.from("products").update(payload).eq("id", editProduct.id);
-      if (error) {
-        toast({ title: "Error updating", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Product updated 👑" });
-      }
-    } else {
-      const { error } = await supabase.from("products").insert(payload);
-      if (error) {
-        toast({ title: "Error adding", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Product added 👑" });
-      }
-    }
-    setEditProduct(null);
-    setShowAddForm(false);
-    fetchProducts();
-  };
-
-  const handleDeleteProduct = async (id: string) => {
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error deleting", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Product deleted" });
+    const { error } = editProduct.id
+      ? await supabase.from("products").update(payload).eq("id", editProduct.id)
+      : await supabase.from("products").insert(payload);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else {
+      toast({ title: editProduct.id ? "Product updated 👑" : "Product added 👑" });
+      setEditProduct(null);
+      setShowAddForm(false);
       fetchProducts();
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate("/admin");
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm("Delete this product?")) return;
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: "Deleted" }); fetchProducts(); }
   };
+
+  const moderateReview = async (id: string, approved: boolean) => {
+    const { error } = await supabase.from("reviews").update({ approved }).eq("id", id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: approved ? "Review approved" : "Review unpublished" }); fetchReviews(); }
+  };
+
+  const deleteReview = async (id: string) => {
+    if (!confirm("Delete this review?")) return;
+    const { error } = await supabase.from("reviews").delete().eq("id", id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: "Review deleted" }); fetchReviews(); }
+  };
+
+  const handleLogout = async () => { await signOut(); navigate("/admin"); };
 
   if (loading || !user) return null;
 
   const formatPrice = (p: number) => `₹${p.toLocaleString("en-IN")}`;
+  const inputCls = "w-full px-3 py-2 border border-border rounded-md font-body text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/50";
+  const labelCls = "font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-1 block";
+  const btnPrimary = "flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-body text-xs font-bold tracking-wider uppercase rounded-md hover:opacity-90 transition-opacity disabled:opacity-50";
 
   return (
     <div className="min-h-screen bg-muted/30 flex">
@@ -147,29 +188,21 @@ const AdminDashboardPage = () => {
             <p className="font-body text-[10px] text-background/40 tracking-wider uppercase">Command Center</p>
           </div>
         </div>
-
         <nav className="flex-1 space-y-1">
           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md font-body text-xs font-medium tracking-wider transition-colors ${
                 activeTab === tab.id ? "bg-primary/20 text-primary" : "text-background/50 hover:text-background hover:bg-background/5"
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
+              }`}>
+              <tab.icon className="w-4 h-4" /> {tab.label}
             </button>
           ))}
         </nav>
-
         <div className="border-t border-background/10 pt-4 mt-4">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
-              <Crown className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <p className="font-body text-xs font-semibold text-background">{user.email}</p>
+            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center"><Crown className="w-4 h-4 text-primary" /></div>
+            <div className="min-w-0">
+              <p className="font-body text-xs font-semibold text-background truncate">{user.email}</p>
               <p className="font-body text-[10px] text-background/40">Admin</p>
             </div>
           </div>
@@ -179,13 +212,10 @@ const AdminDashboardPage = () => {
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 p-8 overflow-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">
-              {tabs.find(t => t.id === activeTab)?.label || "Overview"}
-            </h1>
+            <h1 className="font-display text-2xl font-bold text-foreground">{tabs.find(t => t.id === activeTab)?.label}</h1>
             <p className="font-body text-sm text-muted-foreground mt-1">God Mode Active — Total Control</p>
           </div>
           <Link to="/" target="_blank" className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-foreground font-body text-xs font-semibold tracking-wider uppercase rounded-md hover:bg-primary/20 transition-colors">
@@ -193,37 +223,32 @@ const AdminDashboardPage = () => {
           </Link>
         </div>
 
-        {/* Overview */}
         {activeTab === "overview" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {[
-                { label: "Products", value: String(products.length), icon: Package },
-                { label: "Orders", value: String(orders.length), icon: ShoppingBag },
-                { label: "Revenue", value: formatPrice(orders.reduce((s, o) => s + o.total, 0)), icon: DollarSign },
-                { label: "Active Products", value: String(products.filter(p => p.status === "active").length), icon: BarChart3 },
-              ].map((stat) => (
-                <div key={stat.label} className="bg-background rounded-xl p-6 border border-border/50 shadow-sm">
-                  <stat.icon className="w-5 h-5 text-muted-foreground mb-3" />
-                  <p className="font-display text-2xl font-bold text-foreground">{stat.value}</p>
-                  <p className="font-body text-xs text-muted-foreground mt-1">{stat.label}</p>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[
+              { label: "Products", value: String(products.length), icon: Package },
+              { label: "Orders", value: String(orders.length), icon: ShoppingBag },
+              { label: "Revenue", value: formatPrice(orders.reduce((s, o) => s + o.total, 0)), icon: DollarSign },
+              { label: "Pending Reviews", value: String(reviews.filter(r => !r.approved).length), icon: Star },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-background rounded-xl p-6 border border-border/50 shadow-sm">
+                <stat.icon className="w-5 h-5 text-muted-foreground mb-3" />
+                <p className="font-display text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="font-body text-xs text-muted-foreground mt-1">{stat.label}</p>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Products */}
         {activeTab === "products" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="font-body text-sm text-muted-foreground">{products.length} products</p>
-              <button onClick={() => { setEditProduct({ status: "active" }); setShowAddForm(true); }} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-body text-xs font-bold tracking-wider uppercase rounded-md shimmer">
+              <button onClick={() => { setEditProduct({ status: "active" }); setShowAddForm(true); }} className={btnPrimary}>
                 <Plus className="w-3.5 h-3.5" /> Add Product
               </button>
             </div>
 
-            {/* Add/Edit Form */}
             {(showAddForm || editProduct?.id) && editProduct && (
               <div className="bg-background rounded-xl border border-primary/30 p-6 space-y-4">
                 <div className="flex justify-between items-center">
@@ -231,131 +256,109 @@ const AdminDashboardPage = () => {
                   <button onClick={() => { setEditProduct(null); setShowAddForm(false); }}><X className="w-4 h-4" /></button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><label className={labelCls}>Name</label><input className={inputCls} value={editProduct.name || ""} onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })} /></div>
+                  <div><label className={labelCls}>Price (₹)</label><input type="number" className={inputCls} value={editProduct.price || ""} onChange={(e) => setEditProduct({ ...editProduct, price: Number(e.target.value) })} /></div>
                   <div>
-                    <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-1 block">Name</label>
-                    <input value={editProduct.name || ""} onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })} className="w-full px-3 py-2 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
-                  </div>
-                  <div>
-                    <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-1 block">Price (₹)</label>
-                    <input type="number" value={editProduct.price || ""} onChange={(e) => setEditProduct({ ...editProduct, price: Number(e.target.value) })} className="w-full px-3 py-2 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
-                  </div>
-                  <div>
-                    <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-1 block">Category</label>
-                    <select value={editProduct.category || ""} onChange={(e) => setEditProduct({ ...editProduct, category: e.target.value })} className="w-full px-3 py-2 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                    <label className={labelCls}>Category</label>
+                    <select className={inputCls} value={editProduct.category || ""} onChange={(e) => setEditProduct({ ...editProduct, category: e.target.value })}>
                       <option value="">Select...</option>
                       {categories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-1 block">Tag</label>
-                    <input value={editProduct.tag || ""} onChange={(e) => setEditProduct({ ...editProduct, tag: e.target.value })} className="w-full px-3 py-2 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="Bestseller, New, Limited..." />
-                  </div>
+                  <div><label className={labelCls}>Tag (Bestseller, New...)</label><input className={inputCls} value={editProduct.tag || ""} onChange={(e) => setEditProduct({ ...editProduct, tag: e.target.value })} /></div>
                   <div className="md:col-span-2">
-                    <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-1 block">Description</label>
-                    <textarea value={editProduct.description || ""} onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })} rows={2} className="w-full px-3 py-2 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelCls + " mb-0"}>Description</label>
+                      <button type="button" onClick={generateAIDescription} disabled={generatingDesc} className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline disabled:opacity-50">
+                        {generatingDesc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {generatingDesc ? "Generating..." : "AI Description"}
+                      </button>
+                    </div>
+                    <textarea rows={4} className={inputCls + " resize-none"} value={editProduct.description || ""} onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })} />
                   </div>
                   <div>
-                    <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-1 block">Status</label>
-                    <select value={editProduct.status || "active"} onChange={(e) => setEditProduct({ ...editProduct, status: e.target.value })} className="w-full px-3 py-2 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                    <label className={labelCls}>Status</label>
+                    <select className={inputCls} value={editProduct.status || "active"} onChange={(e) => setEditProduct({ ...editProduct, status: e.target.value })}>
                       <option value="active">Active</option>
                       <option value="draft">Draft</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Media Upload Section */}
                 <div className="border-t border-border/50 pt-4">
                   <h4 className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-3 flex items-center gap-2">
-                    <Upload className="w-3.5 h-3.5" /> Upload Media
+                    <Upload className="w-3.5 h-3.5" /> Upload Media (Video preferred)
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Photo Upload */}
                     <div>
-                      <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-2 block">Product Photo</label>
+                      <label className={labelCls}>Product Photo</label>
                       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f, "image"); }} />
                       {editProduct.image_url ? (
                         <div className="relative group">
-                          <img src={editProduct.image_url} alt="Product" className="w-full h-32 object-cover rounded-lg border border-border" />
+                          <img src={editProduct.image_url} alt="" className="w-full h-32 object-cover rounded-lg border border-border" />
                           <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                            <button onClick={() => imageInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md font-body text-xs font-semibold">Replace</button>
-                            <button onClick={() => setEditProduct({ ...editProduct, image_url: null })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md font-body text-xs font-semibold">Remove</button>
+                            <button onClick={() => imageInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md text-xs font-semibold">Replace</button>
+                            <button onClick={() => setEditProduct({ ...editProduct, image_url: null })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-xs">Remove</button>
                           </div>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => imageInputRef.current?.click()}
-                          disabled={uploadingImage}
-                          className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors disabled:opacity-50"
-                        >
+                        <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}
+                          className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 disabled:opacity-50">
                           {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <ImageIcon className="w-5 h-5 text-muted-foreground" />}
-                          <span className="font-body text-xs text-muted-foreground">{uploadingImage ? "Uploading..." : "Click to upload photo"}</span>
+                          <span className="font-body text-xs text-muted-foreground">{uploadingImage ? "Uploading..." : "Upload photo"}</span>
                         </button>
                       )}
                     </div>
-
-                    {/* Video Upload */}
                     <div>
-                      <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-2 block">Product Video</label>
+                      <label className={labelCls}>Product Video ⭐</label>
                       <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f, "video"); }} />
-                      {(editProduct as any).video_url ? (
+                      {editProduct.video_url ? (
                         <div className="relative group">
-                          <video src={(editProduct as any).video_url} className="w-full h-32 object-cover rounded-lg border border-border" muted />
+                          <video src={editProduct.video_url} className="w-full h-32 object-cover rounded-lg border border-primary" muted />
                           <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                            <button onClick={() => videoInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md font-body text-xs font-semibold">Replace</button>
-                            <button onClick={() => setEditProduct({ ...editProduct, video_url: null })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md font-body text-xs font-semibold">Remove</button>
+                            <button onClick={() => videoInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md text-xs">Replace</button>
+                            <button onClick={() => setEditProduct({ ...editProduct, video_url: null })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-xs">Remove</button>
                           </div>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => videoInputRef.current?.click()}
-                          disabled={uploadingVideo}
-                          className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors disabled:opacity-50"
-                        >
-                          {uploadingVideo ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Video className="w-5 h-5 text-muted-foreground" />}
-                          <span className="font-body text-xs text-muted-foreground">{uploadingVideo ? "Uploading..." : "Click to upload video"}</span>
+                        <button onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo}
+                          className="w-full h-32 border-2 border-dashed border-primary/40 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary disabled:opacity-50 bg-primary/5">
+                          {uploadingVideo ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Video className="w-5 h-5 text-primary" />}
+                          <span className="font-body text-xs text-foreground font-semibold">{uploadingVideo ? "Uploading..." : "Upload video"}</span>
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="font-body text-[10px] text-muted-foreground mt-2">Supported: JPG, PNG, WebP for photos • MP4, MOV, WebM for videos</p>
                 </div>
 
-                <button onClick={handleSaveProduct} className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-body text-xs font-bold tracking-wider uppercase rounded-md shimmer">
-                  <Save className="w-3.5 h-3.5" /> {editProduct.id ? "Update Product" : "Add Product"}
+                <button onClick={handleSaveProduct} className={btnPrimary}>
+                  <Save className="w-3.5 h-3.5" /> {editProduct.id ? "Update" : "Add"} Product
                 </button>
               </div>
             )}
 
-            <div className="bg-background rounded-xl border border-border/50 overflow-hidden">
+            <div className="bg-background rounded-xl border border-border/50 overflow-x-auto">
               <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border/50 bg-muted/30">
-                    <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Product</th>
-                    <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Price</th>
-                    <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Category</th>
-                    <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Status</th>
-                    <th className="text-right font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Actions</th>
-                  </tr>
-                </thead>
+                <thead><tr className="border-b border-border/50 bg-muted/30">
+                  {["Product", "Price", "Category", "Status", "Actions"].map((h) => (
+                    <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>
+                  ))}
+                </tr></thead>
                 <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
-                      <td className="font-body text-sm font-semibold text-foreground py-3 px-4">
-                        {product.name}
-                        {product.tag && <span className="ml-2 text-[10px] font-bold text-primary">{product.tag}</span>}
+                  {products.map((p) => (
+                    <tr key={p.id} className="border-b border-border/30 hover:bg-muted/10">
+                      <td className="font-body text-sm font-semibold text-foreground py-3 px-4 flex items-center gap-2">
+                        {p.video_url ? <Video className="w-3.5 h-3.5 text-primary" /> : p.image_url ? <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" /> : null}
+                        {p.name}
                       </td>
-                      <td className="font-body text-sm font-bold text-foreground py-3 px-4">{formatPrice(product.price)}</td>
-                      <td className="font-body text-xs text-muted-foreground py-3 px-4">{product.category}</td>
+                      <td className="font-body text-sm font-bold py-3 px-4">{formatPrice(p.price)}</td>
+                      <td className="font-body text-xs text-muted-foreground py-3 px-4">{p.category}</td>
                       <td className="py-3 px-4">
-                        <span className={`font-body text-xs font-semibold px-2.5 py-1 rounded-full ${
-                          product.status === "active" ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"
-                        }`}>{product.status}</span>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${p.status === "active" ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{p.status}</span>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => setEditProduct(product)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><Edit3 className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => handleDeleteProduct(product.id)} className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-                        </div>
+                        <button onClick={() => setEditProduct(p)} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
                       </td>
                     </tr>
                   ))}
@@ -365,139 +368,114 @@ const AdminDashboardPage = () => {
           </div>
         )}
 
-        {/* Orders */}
+        {activeTab === "reviews" && (
+          <div className="space-y-3">
+            <p className="font-body text-sm text-muted-foreground">{reviews.filter(r => !r.approved).length} pending • {reviews.filter(r => r.approved).length} approved</p>
+            {reviews.length === 0 ? (
+              <p className="text-center font-body text-sm text-muted-foreground py-12">No reviews yet</p>
+            ) : reviews.map((r) => {
+              const product = products.find(p => p.id === r.product_id);
+              return (
+                <div key={r.id} className="bg-background rounded-xl border border-border/50 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <p className="font-body text-sm font-semibold text-foreground">{r.customer_name}</p>
+                        <div className="flex">{[1,2,3,4,5].map(s => <Star key={s} className={`w-3.5 h-3.5 ${s <= r.rating ? "fill-primary text-primary" : "text-muted"}`} />)}</div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${r.approved ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                          {r.approved ? "Approved" : "Pending"}
+                        </span>
+                      </div>
+                      <p className="font-body text-xs text-muted-foreground mb-2">on <strong>{product?.name || "Unknown product"}</strong> • {new Date(r.created_at).toLocaleDateString()}</p>
+                      {r.title && <p className="font-body text-sm font-semibold text-foreground mb-1">{r.title}</p>}
+                      {r.comment && <p className="font-body text-sm text-muted-foreground">{r.comment}</p>}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button onClick={() => moderateReview(r.id, !r.approved)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold ${r.approved ? "bg-muted text-muted-foreground" : "bg-green-600 text-white"}`}>
+                        <Check className="w-3 h-3" /> {r.approved ? "Unpublish" : "Approve"}
+                      </button>
+                      <button onClick={() => deleteReview(r.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-destructive/10 text-destructive">
+                        <Trash2 className="w-3 h-3" /> Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {activeTab === "orders" && (
-          <div className="bg-background rounded-xl border border-border/50 overflow-hidden">
+          <div className="bg-background rounded-xl border border-border/50 overflow-x-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-border/50 bg-muted/30">
-                  <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Order</th>
-                  <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Customer</th>
-                  <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Amount</th>
-                  <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Status</th>
-                  <th className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">Date</th>
-                </tr>
-              </thead>
+              <thead><tr className="border-b border-border/50 bg-muted/30">
+                {["Order", "Customer", "Amount", "Status", "Date"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
+              </tr></thead>
               <tbody>
-                {orders.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr>
-                ) : orders.map((order) => (
-                  <tr key={order.id} className="border-b border-border/30">
-                    <td className="font-body text-sm font-semibold text-foreground py-3 px-4">{order.order_number}</td>
-                    <td className="font-body text-sm text-foreground py-3 px-4">{order.customer_name || "—"}</td>
-                    <td className="font-body text-sm font-bold text-foreground py-3 px-4">{formatPrice(order.total)}</td>
-                    <td className="py-3 px-4">
-                      <span className={`font-body text-xs font-semibold px-2.5 py-1 rounded-full ${
-                        order.status === "delivered" ? "bg-green-100 text-green-700" :
-                        order.status === "shipped" ? "bg-blue-100 text-blue-700" :
-                        "bg-primary/20 text-foreground"
-                      }`}>{order.status}</span>
-                    </td>
-                    <td className="font-body text-sm text-muted-foreground py-3 px-4">{new Date(order.created_at).toLocaleDateString()}</td>
-                  </tr>
-                ))}
+                {orders.length === 0 ? <tr><td colSpan={5} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr> :
+                  orders.map(o => (
+                    <tr key={o.id} className="border-b border-border/30">
+                      <td className="font-body text-sm font-semibold py-3 px-4">{o.order_number}</td>
+                      <td className="font-body text-sm py-3 px-4">{o.customer_name || "—"}</td>
+                      <td className="font-body text-sm font-bold py-3 px-4">{formatPrice(o.total)}</td>
+                      <td className="py-3 px-4"><span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/20 text-foreground">{o.status}</span></td>
+                      <td className="font-body text-sm text-muted-foreground py-3 px-4">{new Date(o.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* Content Editor */}
         {activeTab === "content" && (
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-3xl">
             <div className="bg-background rounded-xl border border-border/50 p-6">
-              <h3 className="font-display text-lg font-semibold text-foreground mb-4">Hero Section</h3>
+              <h3 className="font-display text-lg font-semibold mb-4">Hero Section</h3>
               <div className="space-y-4">
-                <div>
-                  <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-2 block">Tagline Line 1</label>
-                  <input defaultValue="Where Love" className="w-full px-4 py-3 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-                <div>
-                  <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-2 block">Tagline Line 2</label>
-                  <input defaultValue="Unites Empires" className="w-full px-4 py-3 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-body text-xs font-bold tracking-wider uppercase rounded-md">
-                  <Save className="w-3.5 h-3.5" /> Save Changes
-                </button>
+                <div><label className={labelCls}>Headline</label><input className={inputCls} value={hero.title} onChange={(e) => setHero({ ...hero, title: e.target.value })} /></div>
+                <div><label className={labelCls}>Subheadline</label><textarea rows={2} className={inputCls + " resize-none"} value={hero.subtitle} onChange={(e) => setHero({ ...hero, subtitle: e.target.value })} /></div>
+                <button onClick={() => saveContent("hero", hero)} disabled={savingContent} className={btnPrimary}><Save className="w-3.5 h-3.5" /> Save Hero</button>
+              </div>
+            </div>
+
+            <div className="bg-background rounded-xl border border-border/50 p-6">
+              <h3 className="font-display text-lg font-semibold mb-4">Socials & Contact (Live in Footer)</h3>
+              <div className="space-y-4">
+                <div><label className={labelCls}>Instagram URL</label><input className={inputCls} placeholder="https://instagram.com/..." value={socials.instagram} onChange={(e) => setSocials({ ...socials, instagram: e.target.value })} /></div>
+                <div><label className={labelCls}>Email</label><input type="email" className={inputCls} value={socials.email} onChange={(e) => setSocials({ ...socials, email: e.target.value })} /></div>
+                <div><label className={labelCls}>Phone</label><input className={inputCls} value={socials.phone} onChange={(e) => setSocials({ ...socials, phone: e.target.value })} /></div>
+                <button onClick={() => saveContent("socials", socials)} disabled={savingContent} className={btnPrimary}><Save className="w-3.5 h-3.5" /> Save Socials</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Media */}
-        {activeTab === "media" && (
-          <div className="space-y-4">
-            <p className="font-body text-sm text-muted-foreground">Upload images, 3D files (.glb/.gltf), and 4K videos</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {["Hero Banner", "King Avatar", "Shrimati Ji Avatar", "Logo"].map((name) => (
-                <div key={name} className="bg-background rounded-xl border border-border/50 overflow-hidden group">
-                  <div className="aspect-square bg-gradient-to-br from-lavender/30 to-teal-light/20 flex items-center justify-center">
-                    <Image className="w-8 h-8 text-muted-foreground/30" />
-                  </div>
-                  <div className="p-3">
-                    <span className="font-body text-xs font-semibold text-foreground">{name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Users */}
-        {activeTab === "users" && (
-          <div className="bg-background rounded-xl border border-border/50 p-6">
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">Admin Accounts</h3>
-            <p className="font-body text-sm text-muted-foreground mb-4">
-              To add admin users, sign them up and then assign the admin role via Lovable Cloud → Database → user_roles table.
-            </p>
-            <div className="flex items-center gap-4 p-4 rounded-lg border border-border/30">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <Crown className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="font-body text-sm font-semibold text-foreground">{user.email}</p>
-                <p className="font-body text-xs text-muted-foreground">Current Admin</p>
-              </div>
-              <div className="ml-auto flex items-center gap-1">
-                <Shield className="w-3.5 h-3.5 text-green-600" />
-                <span className="font-body text-[10px] text-green-600 font-semibold">Authenticated</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Policies */}
         {activeTab === "policies" && (
-          <div className="space-y-6">
-            {["15-Day Delivery Policy", "4-Day Return Policy", "Mandatory Unboxing Video", "Pre-Paid Only Policy"].map((policy) => (
-              <div key={policy} className="bg-background rounded-xl border border-border/50 p-6">
-                <h3 className="font-display text-lg font-semibold text-foreground mb-3">{policy}</h3>
-                <textarea rows={4} className="w-full px-4 py-3 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" defaultValue={`Edit the ${policy} content here...`} />
-                <button className="mt-3 flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-body text-xs font-bold tracking-wider uppercase rounded-md">
-                  <Save className="w-3.5 h-3.5" /> Update Policy
-                </button>
+          <div className="space-y-6 max-w-3xl">
+            {([
+              { key: "delivery", label: "15-Day Delivery Policy" },
+              { key: "returns", label: "4-Day Return Policy" },
+              { key: "privacy", label: "Privacy Policy" },
+            ] as const).map(({ key, label }) => (
+              <div key={key} className="bg-background rounded-xl border border-border/50 p-6">
+                <h3 className="font-display text-lg font-semibold mb-3">{label}</h3>
+                <textarea rows={5} className={inputCls + " resize-none"} value={policies[key]} onChange={(e) => setPolicies({ ...policies, [key]: e.target.value })} />
               </div>
             ))}
+            <button onClick={() => saveContent("policies", policies)} disabled={savingContent} className={btnPrimary}><Save className="w-3.5 h-3.5" /> Save All Policies</button>
           </div>
         )}
 
-        {/* Settings */}
-        {activeTab === "settings" && (
-          <div className="bg-background rounded-xl border border-border/50 p-6">
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">Store Settings</h3>
-            <div className="space-y-4">
-              {[
-                { label: "Store Name", value: "MISHI Official" },
-                { label: "Contact Email", value: "mishiofficial1701@gmail.com" },
-                { label: "Instagram Handle", value: "@mishiofficial" },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <label className="font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-2 block">{label}</label>
-                  <input defaultValue={value} className="w-full px-4 py-3 border border-border rounded-md font-body text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-              ))}
-              <button className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground font-body text-xs font-bold tracking-wider uppercase rounded-md">
-                <Save className="w-3.5 h-3.5" /> Save Settings
-              </button>
+        {activeTab === "users" && (
+          <div className="bg-background rounded-xl border border-border/50 p-6 max-w-2xl">
+            <h3 className="font-display text-lg font-semibold mb-4">Admin Account</h3>
+            <div className="flex items-center gap-4 p-4 rounded-lg border border-border/30">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center"><Crown className="w-4 h-4 text-primary" /></div>
+              <div className="flex-1">
+                <p className="font-body text-sm font-semibold">{user.email}</p>
+                <p className="font-body text-xs text-muted-foreground">Current Admin</p>
+              </div>
+              <Shield className="w-4 h-4 text-green-600" />
             </div>
           </div>
         )}

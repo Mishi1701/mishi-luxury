@@ -83,7 +83,7 @@ const AdminDashboardPage = () => {
 
   const saveContent = async (key: string, content: object) => {
     setSavingContent(true);
-    const { error } = await supabase.from("site_content").upsert({ section_key: key, content }, { onConflict: "section_key" });
+    const { error } = await supabase.from("site_content").upsert([{ section_key: key, content: content as any }], { onConflict: "section_key" });
     setSavingContent(false);
     if (error) toast({ title: "Save failed", description: error.message, variant: "destructive" });
     else toast({ title: "Saved 👑", description: "Live on website now." });

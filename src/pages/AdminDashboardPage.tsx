@@ -466,6 +466,72 @@ const AdminDashboardPage = () => {
           </div>
         )}
 
+        {activeTab === "payments" && (
+          <div className="space-y-6 max-w-3xl">
+            <div className="bg-background rounded-xl border border-primary/30 p-6">
+              <h3 className="font-display text-lg font-semibold mb-1">UPI Scan & Pay Configuration</h3>
+              <p className="font-body text-xs text-muted-foreground mb-5">Customers will see this QR / VPA on the checkout page.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className={labelCls}>UPI Static QR (Image)</label>
+                  <input ref={qrInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadQr(f); }} />
+                  {upiCfg.qr_url ? (
+                    <div className="relative group">
+                      <img src={upiCfg.qr_url} alt="QR" className="w-full h-48 object-contain rounded-lg border border-border bg-muted/20" />
+                      <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                        <button onClick={() => qrInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md text-xs font-semibold">Replace</button>
+                        <button onClick={() => setUpiCfg({ ...upiCfg, qr_url: "" })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-xs">Remove</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => qrInputRef.current?.click()} disabled={uploadingQr}
+                      className="w-full h-48 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 disabled:opacity-50">
+                      {uploadingQr ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <ImageIcon className="w-6 h-6 text-muted-foreground" />}
+                      <span className="font-body text-xs text-muted-foreground">{uploadingQr ? "Uploading..." : "Upload QR image"}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className={labelCls}>UPI VPA / ID</label>
+                    <input className={inputCls} placeholder="mishi@upi" value={upiCfg.vpa} onChange={(e) => setUpiCfg({ ...upiCfg, vpa: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Merchant Name</label>
+                    <input className={inputCls} value={upiCfg.merchant_name} onChange={(e) => setUpiCfg({ ...upiCfg, merchant_name: e.target.value })} />
+                  </div>
+                  <button onClick={() => saveContent("upi_payment", upiCfg)} disabled={savingContent} className={btnPrimary}>
+                    <Save className="w-3.5 h-3.5" /> Save UPI Settings
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-background rounded-xl border border-border/50 p-6">
+              <h3 className="font-display text-lg font-semibold mb-4">UPI Payments — Awaiting Verification</h3>
+              {orders.filter(o => o.payment_method === "upi" && o.status === "awaiting_upi_verification").length === 0 ? (
+                <p className="font-body text-sm text-muted-foreground py-6 text-center">No pending UPI verifications.</p>
+              ) : (
+                <div className="space-y-3">
+                  {orders.filter(o => o.payment_method === "upi" && o.status === "awaiting_upi_verification").map(o => (
+                    <div key={o.id} className="border border-border/50 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-body text-sm font-bold">{o.order_number} — {formatPrice(o.total)}</p>
+                        <p className="font-body text-xs text-muted-foreground">{o.customer_name} • {o.customer_phone}</p>
+                        <p className="font-body text-xs mt-1">UTR: <span className="font-mono font-semibold text-foreground select-all">{o.transaction_id || "—"}</span></p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => verifyUpiOrder(o.id, true)} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-green-600 text-white">Verify & Ship</button>
+                        <button onClick={() => verifyUpiOrder(o.id, false)} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-destructive/10 text-destructive">Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === "content" && (
           <div className="space-y-6 max-w-3xl">
             <div className="bg-background rounded-xl border border-border/50 p-6">

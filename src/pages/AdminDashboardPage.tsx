@@ -16,6 +16,7 @@ const tabs = [
   { id: "products", label: "Products", icon: Package },
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "orders", label: "Orders", icon: ShoppingBag },
+  { id: "payments", label: "Payments", icon: DollarSign },
   { id: "content", label: "Content", icon: Edit3 },
   { id: "policies", label: "Policies", icon: FileText },
   { id: "users", label: "Users", icon: Users },
@@ -43,6 +44,9 @@ const AdminDashboardPage = () => {
   const [hero, setHero] = useState({ title: "", subtitle: "" });
   const [socials, setSocials] = useState({ instagram: "", email: "", phone: "" });
   const [policies, setPolicies] = useState({ delivery: "", returns: "", privacy: "" });
+  const [upiCfg, setUpiCfg] = useState({ vpa: "", qr_url: "", merchant_name: "MISHI Official" });
+  const [uploadingQr, setUploadingQr] = useState(false);
+  const qrInputRef = useRef<HTMLInputElement>(null);
   const [savingContent, setSavingContent] = useState(false);
 
   useEffect(() => {
@@ -78,7 +82,42 @@ const AdminDashboardPage = () => {
       if (row.section_key === "hero") setHero({ title: c.title || "", subtitle: c.subtitle || "" });
       if (row.section_key === "socials") setSocials({ instagram: c.instagram || "", email: c.email || "", phone: c.phone || "" });
       if (row.section_key === "policies") setPolicies({ delivery: c.delivery || "", returns: c.returns || "", privacy: c.privacy || "" });
+      if (row.section_key === "upi_payment") setUpiCfg({ vpa: c.vpa || "", qr_url: c.qr_url || "", merchant_name: c.merchant_name || "MISHI Official" });
     });
+  };
+
+  const uploadQr = async (file: File) => {
+    setUploadingQr(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `upi-qr/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+      setUpiCfg((p) => ({ ...p, qr_url: urlData.publicUrl }));
+      toast({ title: "QR uploaded — remember to Save 👑" });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally { setUploadingQr(false); }
+  };
+
+  const verifyUpiOrder = async (orderId: string, approve: boolean) => {
+    const { error } = await supabase.from("orders").update({
+      status: approve ? "paid" : "payment_rejected",
+    }).eq("id", orderId);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (approve) {
+      // Auto-create shipment
+      try {
+        await supabase.functions.invoke("shiprocket", {
+          body: { action: "create_shipment_from_order", payload: { order_db_id: orderId } },
+        });
+        toast({ title: "Verified & shipment created 👑" });
+      } catch {
+        toast({ title: "Verified — shipment failed (try manually)" });
+      }
+    } else toast({ title: "Order rejected" });
+    fetchOrders();
   };
 
   const saveContent = async (key: string, content: object) => {
@@ -409,21 +448,93 @@ const AdminDashboardPage = () => {
           <div className="bg-background rounded-xl border border-border/50 overflow-x-auto">
             <table className="w-full">
               <thead><tr className="border-b border-border/50 bg-muted/30">
-                {["Order", "Customer", "Amount", "Status", "Date"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
+                {["Order", "Customer", "Amount", "Pay", "Status", "Tracking", "Date"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
               </tr></thead>
               <tbody>
-                {orders.length === 0 ? <tr><td colSpan={5} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr> :
+                {orders.length === 0 ? <tr><td colSpan={7} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr> :
                   orders.map(o => (
                     <tr key={o.id} className="border-b border-border/30">
                       <td className="font-body text-sm font-semibold py-3 px-4">{o.order_number}</td>
                       <td className="font-body text-sm py-3 px-4">{o.customer_name || "—"}</td>
                       <td className="font-body text-sm font-bold py-3 px-4">{formatPrice(o.total)}</td>
+                      <td className="font-body text-xs uppercase py-3 px-4">{(o as any).payment_method || "—"}</td>
                       <td className="py-3 px-4"><span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/20 text-foreground">{o.status}</span></td>
+                      <td className="py-3 px-4 font-body text-xs">
+                        {(o as any).tracking_url ? (
+                          <a href={(o as any).tracking_url} target="_blank" rel="noopener noreferrer" className="text-primary underline font-semibold">{(o as any).awb_code}</a>
+                        ) : "—"}
+                      </td>
                       <td className="font-body text-sm text-muted-foreground py-3 px-4">{new Date(o.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {activeTab === "payments" && (
+          <div className="space-y-6 max-w-3xl">
+            <div className="bg-background rounded-xl border border-primary/30 p-6">
+              <h3 className="font-display text-lg font-semibold mb-1">UPI Scan & Pay Configuration</h3>
+              <p className="font-body text-xs text-muted-foreground mb-5">Customers will see this QR / VPA on the checkout page.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className={labelCls}>UPI Static QR (Image)</label>
+                  <input ref={qrInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadQr(f); }} />
+                  {upiCfg.qr_url ? (
+                    <div className="relative group">
+                      <img src={upiCfg.qr_url} alt="QR" className="w-full h-48 object-contain rounded-lg border border-border bg-muted/20" />
+                      <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                        <button onClick={() => qrInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md text-xs font-semibold">Replace</button>
+                        <button onClick={() => setUpiCfg({ ...upiCfg, qr_url: "" })} className="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-xs">Remove</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => qrInputRef.current?.click()} disabled={uploadingQr}
+                      className="w-full h-48 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 disabled:opacity-50">
+                      {uploadingQr ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <ImageIcon className="w-6 h-6 text-muted-foreground" />}
+                      <span className="font-body text-xs text-muted-foreground">{uploadingQr ? "Uploading..." : "Upload QR image"}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className={labelCls}>UPI VPA / ID</label>
+                    <input className={inputCls} placeholder="mishi@upi" value={upiCfg.vpa} onChange={(e) => setUpiCfg({ ...upiCfg, vpa: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Merchant Name</label>
+                    <input className={inputCls} value={upiCfg.merchant_name} onChange={(e) => setUpiCfg({ ...upiCfg, merchant_name: e.target.value })} />
+                  </div>
+                  <button onClick={() => saveContent("upi_payment", upiCfg)} disabled={savingContent} className={btnPrimary}>
+                    <Save className="w-3.5 h-3.5" /> Save UPI Settings
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-background rounded-xl border border-border/50 p-6">
+              <h3 className="font-display text-lg font-semibold mb-4">UPI Payments — Awaiting Verification</h3>
+              {orders.filter(o => o.payment_method === "upi" && o.status === "awaiting_upi_verification").length === 0 ? (
+                <p className="font-body text-sm text-muted-foreground py-6 text-center">No pending UPI verifications.</p>
+              ) : (
+                <div className="space-y-3">
+                  {orders.filter(o => o.payment_method === "upi" && o.status === "awaiting_upi_verification").map(o => (
+                    <div key={o.id} className="border border-border/50 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-body text-sm font-bold">{o.order_number} — {formatPrice(o.total)}</p>
+                        <p className="font-body text-xs text-muted-foreground">{o.customer_name} • {o.customer_phone}</p>
+                        <p className="font-body text-xs mt-1">UTR: <span className="font-mono font-semibold text-foreground select-all">{o.transaction_id || "—"}</span></p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => verifyUpiOrder(o.id, true)} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-green-600 text-white">Verify & Ship</button>
+                        <button onClick={() => verifyUpiOrder(o.id, false)} className="px-3 py-1.5 rounded-md text-xs font-semibold bg-destructive/10 text-destructive">Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

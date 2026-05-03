@@ -95,13 +95,25 @@ Deno.serve(async (req) => {
       const data = await res.json();
       if (!res.ok) throw new Error(`Capture failed: ${JSON.stringify(data)}`);
 
-      // Update order in DB if order_db_id supplied
+      // Update order + auto-create shipment via Shiprocket
       if (payload?.order_db_id) {
         const supabase = createClient(
           Deno.env.get("SUPABASE_URL")!,
           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
         );
-        await supabase.from("orders").update({ status: "confirmed" }).eq("id", payload.order_db_id);
+        await supabase.from("orders").update({
+          status: "paid",
+          transaction_id: data?.purchase_units?.[0]?.payments?.captures?.[0]?.id || orderId,
+        }).eq("id", payload.order_db_id);
+
+        // Trigger Shiprocket shipment creation (best-effort)
+        try {
+          await supabase.functions.invoke("shiprocket", {
+            body: { action: "create_shipment_from_order", payload: { order_db_id: payload.order_db_id } },
+          });
+        } catch (e) {
+          console.error("Shiprocket auto-create failed:", e);
+        }
       }
 
       return new Response(JSON.stringify({ status: data.status, capture: data }), {

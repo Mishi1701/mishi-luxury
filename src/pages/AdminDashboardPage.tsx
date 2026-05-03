@@ -448,16 +448,22 @@ const AdminDashboardPage = () => {
           <div className="bg-background rounded-xl border border-border/50 overflow-x-auto">
             <table className="w-full">
               <thead><tr className="border-b border-border/50 bg-muted/30">
-                {["Order", "Customer", "Amount", "Status", "Date"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
+                {["Order", "Customer", "Amount", "Pay", "Status", "Tracking", "Date"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
               </tr></thead>
               <tbody>
-                {orders.length === 0 ? <tr><td colSpan={5} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr> :
+                {orders.length === 0 ? <tr><td colSpan={7} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr> :
                   orders.map(o => (
                     <tr key={o.id} className="border-b border-border/30">
                       <td className="font-body text-sm font-semibold py-3 px-4">{o.order_number}</td>
                       <td className="font-body text-sm py-3 px-4">{o.customer_name || "—"}</td>
                       <td className="font-body text-sm font-bold py-3 px-4">{formatPrice(o.total)}</td>
+                      <td className="font-body text-xs uppercase py-3 px-4">{(o as any).payment_method || "—"}</td>
                       <td className="py-3 px-4"><span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/20 text-foreground">{o.status}</span></td>
+                      <td className="py-3 px-4 font-body text-xs">
+                        {(o as any).tracking_url ? (
+                          <a href={(o as any).tracking_url} target="_blank" rel="noopener noreferrer" className="text-primary underline font-semibold">{(o as any).awb_code}</a>
+                        ) : "—"}
+                      </td>
                       <td className="font-body text-sm text-muted-foreground py-3 px-4">{new Date(o.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}

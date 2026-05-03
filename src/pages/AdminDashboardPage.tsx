@@ -16,6 +16,7 @@ const tabs = [
   { id: "products", label: "Products", icon: Package },
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "orders", label: "Orders", icon: ShoppingBag },
+  { id: "payments", label: "Payments", icon: DollarSign },
   { id: "content", label: "Content", icon: Edit3 },
   { id: "policies", label: "Policies", icon: FileText },
   { id: "users", label: "Users", icon: Users },
@@ -43,6 +44,9 @@ const AdminDashboardPage = () => {
   const [hero, setHero] = useState({ title: "", subtitle: "" });
   const [socials, setSocials] = useState({ instagram: "", email: "", phone: "" });
   const [policies, setPolicies] = useState({ delivery: "", returns: "", privacy: "" });
+  const [upiCfg, setUpiCfg] = useState({ vpa: "", qr_url: "", merchant_name: "MISHI Official" });
+  const [uploadingQr, setUploadingQr] = useState(false);
+  const qrInputRef = useRef<HTMLInputElement>(null);
   const [savingContent, setSavingContent] = useState(false);
 
   useEffect(() => {
@@ -78,7 +82,42 @@ const AdminDashboardPage = () => {
       if (row.section_key === "hero") setHero({ title: c.title || "", subtitle: c.subtitle || "" });
       if (row.section_key === "socials") setSocials({ instagram: c.instagram || "", email: c.email || "", phone: c.phone || "" });
       if (row.section_key === "policies") setPolicies({ delivery: c.delivery || "", returns: c.returns || "", privacy: c.privacy || "" });
+      if (row.section_key === "upi_payment") setUpiCfg({ vpa: c.vpa || "", qr_url: c.qr_url || "", merchant_name: c.merchant_name || "MISHI Official" });
     });
+  };
+
+  const uploadQr = async (file: File) => {
+    setUploadingQr(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `upi-qr/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+      setUpiCfg((p) => ({ ...p, qr_url: urlData.publicUrl }));
+      toast({ title: "QR uploaded — remember to Save 👑" });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally { setUploadingQr(false); }
+  };
+
+  const verifyUpiOrder = async (orderId: string, approve: boolean) => {
+    const { error } = await supabase.from("orders").update({
+      status: approve ? "paid" : "payment_rejected",
+    }).eq("id", orderId);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (approve) {
+      // Auto-create shipment
+      try {
+        await supabase.functions.invoke("shiprocket", {
+          body: { action: "create_shipment_from_order", payload: { order_db_id: orderId } },
+        });
+        toast({ title: "Verified & shipment created 👑" });
+      } catch {
+        toast({ title: "Verified — shipment failed (try manually)" });
+      }
+    } else toast({ title: "Order rejected" });
+    fetchOrders();
   };
 
   const saveContent = async (key: string, content: object) => {

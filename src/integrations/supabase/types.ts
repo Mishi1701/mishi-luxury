@@ -16,44 +16,71 @@ export type Database = {
     Tables: {
       orders: {
         Row: {
+          awb_code: string | null
+          courier_name: string | null
           created_at: string
           customer_email: string | null
           customer_name: string | null
           customer_phone: string | null
+          expected_delivery: string | null
           id: string
           items: Json
           order_number: string
+          payment_method: string | null
+          pincode: string | null
+          shipment_id: string | null
           shipping_address: string | null
+          shipping_cost: number | null
           status: string
           total: number
+          tracking_url: string | null
+          transaction_id: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          awb_code?: string | null
+          courier_name?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          expected_delivery?: string | null
           id?: string
           items?: Json
           order_number: string
+          payment_method?: string | null
+          pincode?: string | null
+          shipment_id?: string | null
           shipping_address?: string | null
+          shipping_cost?: number | null
           status?: string
           total: number
+          tracking_url?: string | null
+          transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          awb_code?: string | null
+          courier_name?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          expected_delivery?: string | null
           id?: string
           items?: Json
           order_number?: string
+          payment_method?: string | null
+          pincode?: string | null
+          shipment_id?: string | null
           shipping_address?: string | null
+          shipping_cost?: number | null
           status?: string
           total?: number
+          tracking_url?: string | null
+          transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
         }

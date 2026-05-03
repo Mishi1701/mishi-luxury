@@ -274,12 +274,12 @@ const CheckoutPage = () => {
                         const { data: result, error } = await supabase.functions.invoke("paypal", {
                           body: { action: "capture_order", payload: { paypal_order_id: data.orderID, order_db_id: orderId } },
                         });
-                        if (error) return toast.error(error.message);
+                        if (error) { toast.error(error.message); return; }
                         if (result?.status === "COMPLETED") {
                           clearCart();
                           toast.success("Payment successful! 🎉");
                           navigate(`/orders/${orderId}`);
-                        } else toast.error("Payment not completed");
+                        } else { toast.error("Payment not completed"); }
                       }}
                       onError={(err) => { console.error(err); toast.error("PayPal error"); }}
                       onCancel={() => toast.info("Payment cancelled")}

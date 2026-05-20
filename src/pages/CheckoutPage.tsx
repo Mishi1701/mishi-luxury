@@ -8,7 +8,7 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  Shield, Lock, ArrowLeft, Crown, AlertTriangle, Loader2, MapPin, Truck, QrCode, CreditCard,
+  Shield, Lock, ArrowLeft, Crown, AlertTriangle, Loader2, MapPin, Truck, QrCode, CreditCard, Globe,
 } from "lucide-react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
@@ -19,7 +19,18 @@ interface AddressForm {
 
 const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID || "sb";
 
-type PaymentTab = "upi" | "paypal";
+type Country = "IN" | "INT";
+type PaymentTab = "razorpay" | "upi" | "paypal";
+
+// Load Razorpay checkout script once
+const loadRazorpayScript = () => new Promise<boolean>((resolve) => {
+  if ((window as any).Razorpay) return resolve(true);
+  const s = document.createElement("script");
+  s.src = "https://checkout.razorpay.com/v1/checkout.js";
+  s.onload = () => resolve(true);
+  s.onerror = () => resolve(false);
+  document.body.appendChild(s);
+});
 
 const CheckoutPage = () => {
   const { items, totalPrice, clearCart } = useCart();
@@ -27,19 +38,20 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
 
   const { content: upiConfig } = useSiteContent<{ vpa: string; qr_url: string; merchant_name: string }>(
-    "upi_payment",
-    { vpa: "", qr_url: "", merchant_name: "MISHI Official" }
+    "upi_payment", { vpa: "", qr_url: "", merchant_name: "MISHI Official" }
   );
 
+  const [country, setCountry] = useState<Country>("IN");
   const [checkingPin, setCheckingPin] = useState(false);
   const [pinServiceable, setPinServiceable] = useState<boolean | null>(null);
   const [shippingCost, setShippingCost] = useState(0);
   const [edd, setEdd] = useState<string | null>(null);
   const [courierName, setCourierName] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [paymentTab, setPaymentTab] = useState<PaymentTab>("upi");
+  const [paymentTab, setPaymentTab] = useState<PaymentTab>("razorpay");
   const [transactionId, setTransactionId] = useState("");
   const [submittingUpi, setSubmittingUpi] = useState(false);
+  const [processingRazorpay, setProcessingRazorpay] = useState(false);
 
   const [form, setForm] = useState<AddressForm>({
     firstName: "", lastName: "", phone: "", email: user?.email || "",
@@ -47,14 +59,22 @@ const CheckoutPage = () => {
   });
   const set = (key: keyof AddressForm, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
+  // Reset payment tab when country changes
+  useEffect(() => {
+    setPaymentTab(country === "IN" ? "razorpay" : "paypal");
+  }, [country]);
+
   const subtotal = totalPrice;
   const gst = Math.round(subtotal * 0.03);
-  const total = subtotal + gst + shippingCost;
+  // For international, use flat shipping fallback if Shiprocket not applicable
+  const effectiveShipping = country === "IN" ? shippingCost : (shippingCost || 2500);
+  const total = subtotal + gst + effectiveShipping;
 
   const checkServiceability = async (pin: string) => {
     if (pin.length !== 6) { setPinServiceable(null); setEdd(null); setShippingCost(0); setCourierName(null); return; }
     setCheckingPin(true);
     try {
+      // SHIPROCKET API TOKEN & ROUTE HERE — handled inside edge function `shiprocket`
       const { data, error } = await supabase.functions.invoke("shiprocket", {
         body: { action: "get_rates", payload: { delivery_postcode: pin, weight: 0.5, cod: false, declared_value: subtotal || 1000 } },
       });
@@ -64,24 +84,23 @@ const CheckoutPage = () => {
         setShippingCost(data.best_courier.rate || 0);
         setCourierName(data.best_courier.courier_name);
         setEdd(data.best_courier.etd || null);
-      } else {
-        setPinServiceable(false);
-      }
+      } else { setPinServiceable(false); }
     } catch { setPinServiceable(null); }
     finally { setCheckingPin(false); }
   };
 
   const isFormValid = () => {
     const { firstName, lastName, phone, email, address, city, state, pincode } = form;
-    return firstName.trim() && lastName.trim() && phone.trim().length >= 10 &&
+    const pinOk = country === "IN" ? pincode.length === 6 : pincode.trim().length >= 3;
+    return firstName.trim() && lastName.trim() && phone.trim().length >= 8 &&
       email.includes("@") && address.trim() && city.trim() && state.trim() &&
-      pincode.length === 6 && items.length > 0;
+      pinOk && items.length > 0;
   };
 
-  const createOrderRecord = async (paymentMethod: PaymentTab): Promise<string | null> => {
+  const createOrderRecord = async (paymentMethod: string): Promise<string | null> => {
     if (!user) { toast.error("Please sign in to checkout"); navigate("/login"); return null; }
     const orderNumber = `MISHI-${Date.now().toString(36).toUpperCase()}`;
-    const fullAddress = `${form.address}, ${form.city}, ${form.state} - ${form.pincode}`;
+    const fullAddress = `${form.address}, ${form.city}, ${form.state} - ${form.pincode}${country === "INT" ? " (International)" : ""}`;
     const { data, error } = await supabase.from("orders").insert({
       user_id: user.id,
       order_number: orderNumber,
@@ -94,7 +113,7 @@ const CheckoutPage = () => {
       shipping_address: fullAddress,
       pincode: form.pincode,
       payment_method: paymentMethod,
-      shipping_cost: shippingCost,
+      shipping_cost: effectiveShipping,
       expected_delivery: edd,
     }).select("id").single();
     if (error) { toast.error(error.message); return null; }
@@ -102,6 +121,63 @@ const CheckoutPage = () => {
     return data.id;
   };
 
+  // ---------- RAZORPAY ----------
+  const handleRazorpay = async () => {
+    if (!isFormValid()) return toast.error("Fill shipping details first");
+    setProcessingRazorpay(true);
+    const ok = await loadRazorpayScript();
+    if (!ok) { setProcessingRazorpay(false); return toast.error("Razorpay SDK failed to load"); }
+
+    const dbOrderId = orderId || await createOrderRecord("razorpay");
+    if (!dbOrderId) { setProcessingRazorpay(false); return; }
+
+    const { data, error } = await supabase.functions.invoke("razorpay", {
+      body: { action: "create_order", payload: { amount_inr: total, order_db_id: dbOrderId } },
+    });
+    if (error || !data?.id) { setProcessingRazorpay(false); return toast.error("Failed to create Razorpay order"); }
+
+    // PASTE RAZORPAY KEY HERE — auto-fetched from edge function (data.key_id)
+    const rzp = new (window as any).Razorpay({
+      key: data.key_id,
+      amount: data.amount,
+      currency: data.currency,
+      name: "MISHI Luxury",
+      description: "Royal Jewellery Purchase",
+      order_id: data.id,
+      prefill: {
+        name: `${form.firstName} ${form.lastName}`,
+        email: form.email,
+        contact: form.phone,
+      },
+      theme: { color: "#7c6f9b" },
+      handler: async (resp: any) => {
+        const { data: verify, error: vErr } = await supabase.functions.invoke("razorpay", {
+          body: {
+            action: "verify_payment",
+            payload: {
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              order_db_id: dbOrderId,
+            },
+          },
+        });
+        setProcessingRazorpay(false);
+        if (vErr || !verify?.verified) return toast.error("Payment verification failed");
+        clearCart();
+        toast.success("Payment successful! 👑");
+        navigate(`/orders/${dbOrderId}`);
+      },
+      modal: { ondismiss: () => setProcessingRazorpay(false) },
+    });
+    rzp.on("payment.failed", (resp: any) => {
+      setProcessingRazorpay(false);
+      toast.error(resp?.error?.description || "Payment failed");
+    });
+    rzp.open();
+  };
+
+  // ---------- UPI ----------
   const handleUpiSubmit = async () => {
     if (!isFormValid()) return toast.error("Fill shipping details first");
     if (transactionId.trim().length < 8) return toast.error("Enter a valid UPI Transaction ID (UTR)");
@@ -109,8 +185,7 @@ const CheckoutPage = () => {
     const id = orderId || await createOrderRecord("upi");
     if (!id) { setSubmittingUpi(false); return; }
     const { error } = await supabase.from("orders").update({
-      transaction_id: transactionId.trim(),
-      status: "awaiting_upi_verification",
+      transaction_id: transactionId.trim(), status: "awaiting_upi_verification",
     }).eq("id", id);
     setSubmittingUpi(false);
     if (error) return toast.error(error.message);
@@ -148,6 +223,17 @@ const CheckoutPage = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
             <div className="lg:col-span-3 space-y-6">
+              {/* Country */}
+              <div className="glass-card rounded-xl p-6">
+                <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Globe className="w-4 h-4" /> Delivery Region
+                </h2>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-muted/40 rounded-lg">
+                  <button onClick={() => setCountry("IN")} className={`py-2.5 rounded-md font-body text-xs font-bold tracking-wider uppercase transition-all ${country === "IN" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}>🇮🇳 India</button>
+                  <button onClick={() => setCountry("INT")} className={`py-2.5 rounded-md font-body text-xs font-bold tracking-wider uppercase transition-all ${country === "INT" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}>🌍 International</button>
+                </div>
+              </div>
+
               {/* Shipping Address */}
               <div className="glass-card rounded-xl p-6">
                 <h2 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -159,22 +245,23 @@ const CheckoutPage = () => {
                     <div><label className={labelCls}>Last Name *</label><input className={inputCls} value={form.lastName} onChange={(e) => set("lastName", e.target.value)} /></div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label className={labelCls}>Phone *</label><input className={inputCls} placeholder="+91 XXXXX XXXXX" value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
+                    <div><label className={labelCls}>Phone *</label><input className={inputCls} placeholder={country === "IN" ? "+91 XXXXX XXXXX" : "+1 XXX XXX XXXX"} value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
                     <div><label className={labelCls}>Email *</label><input className={inputCls} value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
                   </div>
                   <div><label className={labelCls}>Address *</label><input className={inputCls} value={form.address} onChange={(e) => set("address", e.target.value)} /></div>
                   <div className="grid grid-cols-3 gap-4">
                     <div><label className={labelCls}>City *</label><input className={inputCls} value={form.city} onChange={(e) => set("city", e.target.value)} /></div>
-                    <div><label className={labelCls}>State *</label><input className={inputCls} value={form.state} onChange={(e) => set("state", e.target.value)} /></div>
+                    <div><label className={labelCls}>{country === "IN" ? "State *" : "State / Country *"}</label><input className={inputCls} value={form.state} onChange={(e) => set("state", e.target.value)} /></div>
                     <div>
-                      <label className={labelCls}>PIN Code *</label>
-                      <input className={inputCls} maxLength={6} value={form.pincode} onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, "");
+                      <label className={labelCls}>{country === "IN" ? "PIN Code *" : "ZIP / Postal *"}</label>
+                      <input className={inputCls} maxLength={country === "IN" ? 6 : 10} value={form.pincode} onChange={(e) => {
+                        const val = country === "IN" ? e.target.value.replace(/\D/g, "") : e.target.value;
                         set("pincode", val);
-                        if (val.length === 6) checkServiceability(val); else { setPinServiceable(null); setShippingCost(0); setEdd(null); }
+                        if (country === "IN" && val.length === 6) checkServiceability(val);
+                        else { setPinServiceable(null); setShippingCost(0); setEdd(null); }
                       }} />
-                      {checkingPin && <div className="flex items-center gap-2 mt-2 text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span className="font-body text-xs">Checking…</span></div>}
-                      {pinServiceable === true && (
+                      {country === "IN" && checkingPin && <div className="flex items-center gap-2 mt-2 text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span className="font-body text-xs">Checking…</span></div>}
+                      {country === "IN" && pinServiceable === true && (
                         <div className="mt-2 space-y-0.5">
                           <div className="flex items-center gap-2 text-green-600">
                             <Truck className="w-3.5 h-3.5" />
@@ -183,7 +270,8 @@ const CheckoutPage = () => {
                           {edd && <p className="font-body text-[11px] text-muted-foreground">Expected Delivery by <strong className="text-foreground">{edd}</strong></p>}
                         </div>
                       )}
-                      {pinServiceable === false && <div className="flex items-center gap-2 mt-2 text-destructive"><AlertTriangle className="w-3.5 h-3.5" /><span className="font-body text-xs font-semibold">Not deliverable</span></div>}
+                      {country === "IN" && pinServiceable === false && <div className="flex items-center gap-2 mt-2 text-destructive"><AlertTriangle className="w-3.5 h-3.5" /><span className="font-body text-xs font-semibold">Not deliverable</span></div>}
+                      {country === "INT" && <p className="font-body text-[11px] text-muted-foreground mt-2">International shipping flat ₹2,500</p>}
                     </div>
                   </div>
                 </div>
@@ -193,29 +281,49 @@ const CheckoutPage = () => {
               <div className="glass-card rounded-xl p-6">
                 <h2 className="font-display text-lg font-semibold text-foreground mb-4">Payment Method</h2>
 
-                <div className="grid grid-cols-2 gap-2 mb-5 p-1 bg-muted/40 rounded-lg">
-                  <button onClick={() => setPaymentTab("upi")} className={`flex items-center justify-center gap-2 py-2.5 rounded-md font-body text-xs font-bold tracking-wider uppercase transition-all ${paymentTab === "upi" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}>
-                    <QrCode className="w-3.5 h-3.5" /> UPI / Scan & Pay
-                  </button>
-                  <button onClick={() => setPaymentTab("paypal")} className={`flex items-center justify-center gap-2 py-2.5 rounded-md font-body text-xs font-bold tracking-wider uppercase transition-all ${paymentTab === "paypal" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}>
-                    <CreditCard className="w-3.5 h-3.5" /> Card / PayPal
-                  </button>
-                </div>
+                {country === "IN" ? (
+                  <div className="grid grid-cols-2 gap-2 mb-5 p-1 bg-muted/40 rounded-lg">
+                    <button onClick={() => setPaymentTab("razorpay")} className={`flex items-center justify-center gap-2 py-2.5 rounded-md font-body text-xs font-bold tracking-wider uppercase transition-all ${paymentTab === "razorpay" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}>
+                      <CreditCard className="w-3.5 h-3.5" /> UPI / Cards (India)
+                    </button>
+                    <button onClick={() => setPaymentTab("upi")} className={`flex items-center justify-center gap-2 py-2.5 rounded-md font-body text-xs font-bold tracking-wider uppercase transition-all ${paymentTab === "upi" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"}`}>
+                      <QrCode className="w-3.5 h-3.5" /> Scan & Pay
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mb-5 p-3 bg-muted/40 rounded-lg flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-body text-xs text-muted-foreground">International orders are processed via <strong className="text-foreground">PayPal</strong> in USD.</span>
+                  </div>
+                )}
 
                 {!isFormValid() ? (
                   <div className="bg-muted/30 border border-border/50 rounded-lg p-6 text-center">
                     <Lock className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
                     <p className="font-body text-xs text-muted-foreground">Fill shipping details to unlock payment.</p>
                   </div>
-                ) : pinServiceable === false ? (
+                ) : country === "IN" && pinServiceable === false ? (
                   <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 text-center">
                     <p className="font-body text-xs text-destructive font-semibold">Delivery not available at your pincode.</p>
                   </div>
-                ) : paymentTab === "upi" ? (
+                ) : country === "IN" && paymentTab === "razorpay" ? (
+                  <div className="space-y-4">
+                    <div className="bg-foreground text-background rounded-md p-4">
+                      <p className="font-body text-[10px] uppercase tracking-wider text-background/60">Amount Payable</p>
+                      <p className="font-display text-2xl font-bold">₹{total.toLocaleString()}</p>
+                    </div>
+                    <button onClick={handleRazorpay} disabled={processingRazorpay}
+                      className="w-full py-3.5 bg-primary text-primary-foreground font-body text-sm font-bold tracking-widest uppercase rounded-md hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+                      {processingRazorpay ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                      Pay via UPI / Cards (India)
+                    </button>
+                    <p className="font-body text-[11px] text-muted-foreground text-center">Powered by Razorpay • UPI, Cards, Netbanking, Wallets</p>
+                  </div>
+                ) : country === "IN" && paymentTab === "upi" ? (
                   <div className="space-y-4">
                     {!upiConfig.vpa && !upiConfig.qr_url ? (
                       <div className="bg-muted/30 border border-border/50 rounded-lg p-6 text-center">
-                        <p className="font-body text-xs text-muted-foreground">UPI not configured yet. Please use Card / PayPal or contact us.</p>
+                        <p className="font-body text-xs text-muted-foreground">UPI not configured yet. Please use Razorpay above.</p>
                       </div>
                     ) : (
                       <>
@@ -241,14 +349,11 @@ const CheckoutPage = () => {
                             </div>
                           </div>
                         </div>
-
                         <div>
                           <label className={labelCls}>Enter UPI Transaction ID (UTR) *</label>
-                          <input className={inputCls} placeholder="e.g. 412345678901"
-                            value={transactionId} onChange={(e) => setTransactionId(e.target.value)} />
-                          <p className="font-body text-[11px] text-muted-foreground mt-1.5">After successful payment, paste the 12-digit UTR/Reference ID from your UPI app.</p>
+                          <input className={inputCls} placeholder="e.g. 412345678901" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} />
+                          <p className="font-body text-[11px] text-muted-foreground mt-1.5">After payment, paste the 12-digit UTR from your UPI app.</p>
                         </div>
-
                         <button onClick={handleUpiSubmit} disabled={submittingUpi}
                           className="w-full py-3 bg-primary text-primary-foreground font-body text-sm font-bold tracking-widest uppercase rounded-md hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
                           {submittingUpi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
@@ -258,6 +363,8 @@ const CheckoutPage = () => {
                     )}
                   </div>
                 ) : (
+                  // International → PayPal
+                  // PASTE PAYPAL CLIENT ID HERE — via VITE_PAYPAL_CLIENT_ID env
                   <PayPalScriptProvider options={{ clientId: PAYPAL_CLIENT_ID, currency: "USD", intent: "capture" }}>
                     <PayPalButtons
                       style={{ layout: "vertical", color: "gold", shape: "rect", label: "pay" }}
@@ -323,8 +430,8 @@ const CheckoutPage = () => {
                   <div className="flex justify-between font-body text-sm"><span className="text-muted-foreground">GST (3%)</span><span>₹{gst.toLocaleString()}</span></div>
                   <div className="flex justify-between font-body text-sm">
                     <span className="text-muted-foreground">Shipping</span>
-                    <span className={shippingCost === 0 ? "text-muted-foreground" : ""}>
-                      {shippingCost > 0 ? `₹${shippingCost.toLocaleString()}` : "Enter PIN"}
+                    <span className={effectiveShipping === 0 ? "text-muted-foreground" : ""}>
+                      {effectiveShipping > 0 ? `₹${effectiveShipping.toLocaleString()}` : (country === "IN" ? "Enter PIN" : "—")}
                     </span>
                   </div>
                   {edd && <p className="font-body text-[11px] text-green-700">Expected Delivery by <strong>{edd}</strong></p>}

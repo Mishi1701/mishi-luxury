@@ -8,7 +8,7 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  Shield, Lock, ArrowLeft, Crown, AlertTriangle, Loader2, MapPin, Truck, QrCode, CreditCard, Globe,
+  Shield, Lock, ArrowLeft, Crown, AlertTriangle, Loader2, MapPin, Truck, QrCode, CreditCard, Globe, Tag, Check, X,
 } from "lucide-react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
@@ -53,10 +53,16 @@ const CheckoutPage = () => {
   const [submittingUpi, setSubmittingUpi] = useState(false);
   const [processingRazorpay, setProcessingRazorpay] = useState(false);
 
+  // Promo code state
+  const [promoInput, setPromoInput] = useState("");
+  const [applyingPromo, setApplyingPromo] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount_type: string; discount_value: number } | null>(null);
+
   const [form, setForm] = useState<AddressForm>({
-    firstName: "", lastName: "", phone: "", email: user?.email || "",
+    firstName: "", lastName: "", phone: user?.email || "",
+    email: user?.email || "",
     address: "", city: "", state: "", pincode: "",
-  });
+  } as any);
   const set = (key: keyof AddressForm, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
   // Reset payment tab when country changes
@@ -66,9 +72,44 @@ const CheckoutPage = () => {
 
   const subtotal = totalPrice;
   const gst = Math.round(subtotal * 0.03);
-  // For international, use flat shipping fallback if Shiprocket not applicable
   const effectiveShipping = country === "IN" ? shippingCost : (shippingCost || 2500);
-  const total = subtotal + gst + effectiveShipping;
+  const discount = appliedCoupon
+    ? appliedCoupon.discount_type === "percent"
+      ? Math.round((subtotal * appliedCoupon.discount_value) / 100)
+      : Math.min(appliedCoupon.discount_value, subtotal)
+    : 0;
+  const total = Math.max(0, subtotal + gst + effectiveShipping - discount);
+
+  const applyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return toast.error("Enter a promo code");
+    setApplyingPromo(true);
+    try {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("code, discount_type, discount_value, min_subtotal, max_uses, used_count, expires_at, active")
+        .eq("code", code)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return toast.error("Invalid promo code");
+      if (!data.active) return toast.error("This coupon is inactive");
+      if (data.expires_at && new Date(data.expires_at) < new Date()) return toast.error("This coupon has expired");
+      if (data.max_uses != null && data.used_count >= data.max_uses) return toast.error("This coupon has reached its limit");
+      if (subtotal < (data.min_subtotal || 0)) return toast.error(`Minimum subtotal ₹${data.min_subtotal} required`);
+      setAppliedCoupon({ code: data.code, discount_type: data.discount_type, discount_value: data.discount_value });
+      toast.success(`Coupon ${data.code} applied 👑`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to apply coupon");
+    } finally {
+      setApplyingPromo(false);
+    }
+  };
+
+  const removePromo = () => {
+    setAppliedCoupon(null);
+    setPromoInput("");
+  };
+
 
   const checkServiceability = async (pin: string) => {
     if (pin.length !== 6) { setPinServiceable(null); setEdd(null); setShippingCost(0); setCourierName(null); return; }

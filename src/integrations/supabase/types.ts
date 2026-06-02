@@ -14,14 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      coupons: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          description: string | null
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          max_uses: number | null
+          min_subtotal: number
+          updated_at: string
+          used_count: number
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value: number
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          min_subtotal?: number
+          updated_at?: string
+          used_count?: number
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          min_subtotal?: number
+          updated_at?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           awb_code: string | null
+          coupon_code: string | null
           courier_name: string | null
           created_at: string
           customer_email: string | null
           customer_name: string | null
           customer_phone: string | null
+          discount_amount: number
           expected_delivery: string | null
           id: string
           items: Json
@@ -40,11 +87,13 @@ export type Database = {
         }
         Insert: {
           awb_code?: string | null
+          coupon_code?: string | null
           courier_name?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          discount_amount?: number
           expected_delivery?: string | null
           id?: string
           items?: Json
@@ -63,11 +112,13 @@ export type Database = {
         }
         Update: {
           awb_code?: string | null
+          coupon_code?: string | null
           courier_name?: string | null
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
           customer_phone?: string | null
+          discount_amount?: number
           expected_delivery?: string | null
           id?: string
           items?: Json

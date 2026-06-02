@@ -48,9 +48,16 @@ const AdminDashboardPage = () => {
   const [socials, setSocials] = useState({ instagram: "", email: "", phone: "" });
   const [policies, setPolicies] = useState({ delivery: "", returns: "", privacy: "" });
   const [upiCfg, setUpiCfg] = useState({ vpa: "", qr_url: "", merchant_name: "MISHI Official" });
+  const [branding, setBranding] = useState({ logo_url: "" });
   const [uploadingQr, setUploadingQr] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const qrInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [savingContent, setSavingContent] = useState(false);
+
+  // Coupons state
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [newCoupon, setNewCoupon] = useState<Partial<Coupon>>({ code: "", discount_type: "percent", discount_value: 10, min_subtotal: 0, active: true });
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) navigate("/admin");

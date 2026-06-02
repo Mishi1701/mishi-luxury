@@ -10,12 +10,15 @@ import type { Tables } from "@/integrations/supabase/types";
 type Product = Tables<"products">;
 type Review = Tables<"reviews">;
 type Order = Tables<"orders">;
+type Coupon = { id: string; code: string; discount_type: string; discount_value: number; min_subtotal: number; max_uses: number | null; used_count: number; expires_at: string | null; active: boolean; description: string | null; created_at: string };
 
 const tabs = [
   { id: "overview", label: "Overview", icon: BarChart3 },
   { id: "products", label: "Products", icon: Package },
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "orders", label: "Orders", icon: ShoppingBag },
+  { id: "coupons", label: "Owner's Discount", icon: Sparkles },
+  { id: "branding", label: "Branding", icon: ImageIcon },
   { id: "payments", label: "Payments", icon: DollarSign },
   { id: "content", label: "Content", icon: Edit3 },
   { id: "policies", label: "Policies", icon: FileText },

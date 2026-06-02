@@ -68,7 +68,13 @@ const AdminDashboardPage = () => {
     fetchOrders();
     fetchReviews();
     fetchContent();
+    fetchCoupons();
   }, []);
+
+  const fetchCoupons = async () => {
+    const { data } = await (supabase as any).from("coupons").select("*").order("created_at", { ascending: false });
+    if (data) setCoupons(data);
+  };
 
   const fetchProducts = async () => {
     const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
@@ -93,8 +99,87 @@ const AdminDashboardPage = () => {
       if (row.section_key === "socials") setSocials({ instagram: c.instagram || "", email: c.email || "", phone: c.phone || "" });
       if (row.section_key === "policies") setPolicies({ delivery: c.delivery || "", returns: c.returns || "", privacy: c.privacy || "" });
       if (row.section_key === "upi_payment") setUpiCfg({ vpa: c.vpa || "", qr_url: c.qr_url || "", merchant_name: c.merchant_name || "MISHI Official" });
+      if (row.section_key === "branding") setBranding({ logo_url: c.logo_url || "" });
     });
   };
+
+  const uploadLogo = async (file: File) => {
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `branding/logo-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+      const next = { logo_url: urlData.publicUrl };
+      setBranding(next);
+      await saveContent("branding", next);
+      toast({ title: "Logo updated — live across the site 👑" });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally { setUploadingLogo(false); }
+  };
+
+  // ---------- COUPONS ----------
+  const saveCoupon = async () => {
+    if (!newCoupon.code?.trim() || !newCoupon.discount_value) return toast({ title: "Code & value required", variant: "destructive" });
+    const payload = {
+      code: newCoupon.code.trim().toUpperCase(),
+      discount_type: newCoupon.discount_type || "percent",
+      discount_value: Number(newCoupon.discount_value),
+      min_subtotal: Number(newCoupon.min_subtotal || 0),
+      max_uses: newCoupon.max_uses ? Number(newCoupon.max_uses) : null,
+      expires_at: newCoupon.expires_at || null,
+      active: newCoupon.active ?? true,
+      description: newCoupon.description || null,
+    };
+    const { error } = await (supabase as any).from("coupons").insert(payload);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    toast({ title: "Coupon created 👑" });
+    setNewCoupon({ code: "", discount_type: "percent", discount_value: 10, min_subtotal: 0, active: true });
+    fetchCoupons();
+  };
+
+  const toggleCoupon = async (id: string, active: boolean) => {
+    await (supabase as any).from("coupons").update({ active }).eq("id", id);
+    fetchCoupons();
+  };
+
+  const deleteCoupon = async (id: string) => {
+    if (!confirm("Delete this coupon?")) return;
+    await (supabase as any).from("coupons").delete().eq("id", id);
+    fetchCoupons();
+  };
+
+  // ---------- ORDER ACTIONS ----------
+  const acceptOrder = async (orderId: string) => {
+    const { error } = await supabase.from("orders").update({ status: "paid" }).eq("id", orderId);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    try {
+      await supabase.functions.invoke("shiprocket", {
+        body: { action: "create_shipment_from_order", payload: { order_db_id: orderId } },
+      });
+      toast({ title: "Order accepted & shipment created 👑" });
+    } catch { toast({ title: "Accepted — shipment failed; create manually" }); }
+    fetchOrders();
+  };
+
+  const cancelOrder = async (orderId: string) => {
+    if (!confirm("Cancel this order?")) return;
+    const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    toast({ title: "Order cancelled" });
+    fetchOrders();
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    if (!confirm("Permanently delete this order? This cannot be undone.")) return;
+    const { error } = await supabase.from("orders").delete().eq("id", orderId);
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    toast({ title: "Order deleted" });
+    fetchOrders();
+  };
+
 
   const uploadQr = async (file: File) => {
     setUploadingQr(true);

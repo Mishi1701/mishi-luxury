@@ -59,10 +59,9 @@ const CheckoutPage = () => {
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount_type: string; discount_value: number } | null>(null);
 
   const [form, setForm] = useState<AddressForm>({
-    firstName: "", lastName: "", phone: user?.email || "",
-    email: user?.email || "",
+    firstName: "", lastName: "", phone: "", email: user?.email || "",
     address: "", city: "", state: "", pincode: "",
-  } as any);
+  });
   const set = (key: keyof AddressForm, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
   // Reset payment tab when country changes

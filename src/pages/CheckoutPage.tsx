@@ -474,6 +474,32 @@ const CheckoutPage = () => {
                     </div>
                   ))}
                 </div>
+                <div className="border-t border-border/50 pt-4 mb-4">
+                  <label className="font-body text-[10px] tracking-[0.2em] uppercase text-muted-foreground flex items-center gap-1.5 mb-2"><Tag className="w-3 h-3" /> Promo Code</label>
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between bg-primary/10 border border-primary/30 rounded-md px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-primary" />
+                        <span className="font-mono text-xs font-bold text-foreground">{appliedCoupon.code}</span>
+                        <span className="font-body text-[11px] text-muted-foreground">−₹{discount.toLocaleString()}</span>
+                      </div>
+                      <button onClick={removePromo} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        placeholder="ENTER CODE"
+                        className="flex-1 px-3 py-2 border border-border rounded-md font-mono text-xs tracking-widest bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                      <button onClick={applyPromo} disabled={applyingPromo || !promoInput.trim()}
+                        className="px-4 py-2 bg-foreground text-background font-body text-[11px] font-bold tracking-wider uppercase rounded-md hover:bg-primary hover:text-primary-foreground transition-all disabled:opacity-50">
+                        {applyingPromo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Apply"}
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="border-t border-border/50 pt-4 space-y-2">
                   <div className="flex justify-between font-body text-sm"><span className="text-muted-foreground">Subtotal</span><span>₹{subtotal.toLocaleString()}</span></div>
                   <div className="flex justify-between font-body text-sm"><span className="text-muted-foreground">GST (3%)</span><span>₹{gst.toLocaleString()}</span></div>
@@ -483,6 +509,11 @@ const CheckoutPage = () => {
                       {effectiveShipping > 0 ? `₹${effectiveShipping.toLocaleString()}` : (country === "IN" ? "Enter PIN" : "—")}
                     </span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between font-body text-sm text-primary">
+                      <span>Discount ({appliedCoupon?.code})</span><span>−₹{discount.toLocaleString()}</span>
+                    </div>
+                  )}
                   {edd && <p className="font-body text-[11px] text-green-700">Expected Delivery by <strong>{edd}</strong></p>}
                   <div className="border-t border-border/50 pt-3 flex justify-between">
                     <span className="font-body text-base font-bold text-foreground">Total</span>

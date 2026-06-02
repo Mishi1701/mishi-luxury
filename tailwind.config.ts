@@ -59,6 +59,13 @@ export default {
         "teal-soft": "hsl(var(--teal-soft))",
         silk: "hsl(var(--silk))",
         "royal-glow": "hsl(var(--royal-glow))",
+        noir: "hsl(var(--noir))",
+        "noir-soft": "hsl(var(--noir-soft))",
+        cream: "hsl(var(--cream))",
+        "cream-deep": "hsl(var(--cream-deep))",
+        gold: "hsl(var(--gold))",
+        "gold-bright": "hsl(var(--gold-bright))",
+        "gold-soft": "hsl(var(--gold-soft))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

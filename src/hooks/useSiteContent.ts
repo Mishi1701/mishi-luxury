@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type Socials = { instagram: string; email: string; phone: string };
 export type Policies = { delivery: string; returns: string; privacy: string };
 export type Hero = { title: string; subtitle: string };
+export type Branding = { logo_url: string };
 
 export const useSiteContent = <T,>(key: string, defaults: T): { content: T; loading: boolean; refresh: () => void } => {
   const [content, setContent] = useState<T>(defaults);

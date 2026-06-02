@@ -3,6 +3,7 @@ import { Menu, X, ShoppingBag, ChevronDown, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import mishiLogo from "@/assets/mishi-logo.jpg";
 import { useCart } from "@/hooks/useCart";
+import { useSiteContent, type Branding } from "@/hooks/useSiteContent";
 
 const collections = [
   { label: "Fine Jewellery", path: "/collections/fine-jewellery" },
@@ -24,13 +25,15 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showCollections, setShowCollections] = useState(false);
   const { totalItems, openCart } = useCart();
+  const { content: branding } = useSiteContent<Branding>("branding", { logo_url: "" });
+  const logoSrc = branding.logo_url || mishiLogo;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-white-gold-bright/50">
+    <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-border/40">
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           <Link to="/" className="flex items-center gap-2">
-            <img src={mishiLogo} alt="MISHI Official" className="h-10 lg:h-14 w-auto" />
+            <img src={logoSrc} alt="MISHI Official" className="h-10 lg:h-14 w-auto object-contain" />
           </Link>
 
           {/* Desktop Nav */}

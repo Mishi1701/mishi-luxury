@@ -124,31 +124,31 @@ const CollectionPage = () => {
               {products.map((product, i) => (
                 <div
                   key={product.id}
-                  className="group relative rounded-lg border border-white-gold-bright/30 overflow-hidden hover:shadow-[var(--shadow-gold)] transition-all duration-500 animate-fade-up"
+                  className="luxury-card group animate-fade-up"
                   style={{ animationDelay: `${i * 0.05}s` }}
                 >
-                  <Link to={`/products/${product.id}`} className="block aspect-square bg-gradient-to-br from-lavender/40 to-teal-light/20 flex items-center justify-center overflow-hidden">
+                  <Link to={`/products/${product.id}`} className="block aspect-square bg-gradient-to-br from-cream-deep/40 to-muted/40 flex items-center justify-center overflow-hidden">
                     {product.video_url ? (
-                      <video src={product.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover" poster={product.image_url || undefined} />
+                      <video src={product.video_url} muted loop playsInline autoPlay className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" poster={product.image_url || undefined} />
                     ) : product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                     ) : (
                       <span className="text-5xl opacity-30">👑</span>
                     )}
                   </Link>
                   {product.tag && (
-                    <span className="absolute top-3 left-3 bg-primary text-primary-foreground font-body text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-sm">
+                    <span className="absolute top-3 left-3 z-10 bg-foreground text-background font-body text-[10px] font-bold tracking-[0.18em] uppercase px-2.5 py-1 rounded-sm border border-primary/30">
                       {product.tag}
                     </span>
                   )}
-                  <div className="p-4">
+                  <div className="p-4 relative z-10">
                     <Link to={`/products/${product.id}`}>
-                      <h3 className="font-display text-sm font-semibold text-foreground line-clamp-1 hover:text-primary transition-colors">{product.name}</h3>
+                      <h3 className="font-display text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">{product.name}</h3>
                     </Link>
-                    <p className="font-body text-sm font-bold text-foreground mt-1">{formatPrice(product.price)}</p>
+                    <p className="font-body text-sm font-bold text-foreground mt-1 tracking-wide">{formatPrice(product.price)}</p>
                     <button
                       onClick={() => addItem({ id: product.id, name: product.name, price: product.price, image_url: product.image_url, category: product.category })}
-                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-primary/10 text-foreground font-body text-xs font-semibold tracking-wider uppercase rounded hover:bg-primary/20 transition-colors"
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-foreground text-background font-body text-[11px] font-semibold tracking-[0.15em] uppercase rounded transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" /> Add to Cart
                     </button>

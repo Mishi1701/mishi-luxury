@@ -155,9 +155,18 @@ const CheckoutPage = () => {
       payment_method: paymentMethod,
       shipping_cost: effectiveShipping,
       expected_delivery: edd,
+      coupon_code: appliedCoupon?.code || null,
+      discount_amount: discount,
     }).select("id").single();
     if (error) { toast.error(error.message); return null; }
     setOrderId(data.id);
+    // increment coupon usage (best-effort)
+    if (appliedCoupon) {
+      try {
+        const { data: c } = await supabase.from("coupons").select("used_count").eq("code", appliedCoupon.code).maybeSingle();
+        if (c) await supabase.from("coupons").update({ used_count: (c.used_count || 0) + 1 }).eq("code", appliedCoupon.code);
+      } catch { /* non-fatal */ }
+    }
     return data.id;
   };
 

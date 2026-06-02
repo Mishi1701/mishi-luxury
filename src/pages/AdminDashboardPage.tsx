@@ -543,10 +543,10 @@ const AdminDashboardPage = () => {
           <div className="bg-background rounded-xl border border-border/50 overflow-x-auto">
             <table className="w-full">
               <thead><tr className="border-b border-border/50 bg-muted/30">
-                {["Order", "Customer", "Amount", "Pay", "Status", "Tracking", "Date"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
+                {["Order", "Customer", "Amount", "Pay", "Status", "Tracking", "Date", "Actions"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
               </tr></thead>
               <tbody>
-                {orders.length === 0 ? <tr><td colSpan={7} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr> :
+                {orders.length === 0 ? <tr><td colSpan={8} className="text-center py-8 font-body text-sm text-muted-foreground">No orders yet</td></tr> :
                   orders.map(o => (
                     <tr key={o.id} className="border-b border-border/30">
                       <td className="font-body text-sm font-semibold py-3 px-4">{o.order_number}</td>
@@ -560,12 +560,103 @@ const AdminDashboardPage = () => {
                         ) : "—"}
                       </td>
                       <td className="font-body text-sm text-muted-foreground py-3 px-4">{new Date(o.created_at).toLocaleDateString()}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex gap-1.5">
+                          {o.status !== "paid" && o.status !== "shipment_created" && o.status !== "cancelled" && (
+                            <button onClick={() => acceptOrder(o.id)} title="Accept & Ship" className="p-1.5 rounded bg-green-600/10 text-green-700 hover:bg-green-600 hover:text-white transition-colors"><Check className="w-3.5 h-3.5" /></button>
+                          )}
+                          {o.status !== "cancelled" && (
+                            <button onClick={() => cancelOrder(o.id)} title="Cancel" className="p-1.5 rounded bg-amber-500/10 text-amber-700 hover:bg-amber-500 hover:text-white transition-colors"><X className="w-3.5 h-3.5" /></button>
+                          )}
+                          <button onClick={() => deleteOrder(o.id)} title="Delete" className="p-1.5 rounded bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
               </tbody>
             </table>
           </div>
         )}
+
+        {activeTab === "branding" && (
+          <div className="max-w-2xl space-y-6">
+            <div className="bg-background rounded-xl border border-primary/30 p-6">
+              <h3 className="font-display text-lg font-semibold mb-1">Brand Logo</h3>
+              <p className="font-body text-xs text-muted-foreground mb-5">Upload a new logo — it will instantly replace the old one across Navbar, Footer, and Invoices.</p>
+              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
+              {branding.logo_url ? (
+                <div className="space-y-3">
+                  <div className="bg-foreground rounded-lg p-8 flex items-center justify-center">
+                    <img src={branding.logo_url} alt="Current logo" className="max-h-24 object-contain brightness-[10]" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className={btnPrimary}>
+                      {uploadingLogo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Replace Logo
+                    </button>
+                    <button onClick={async () => { setBranding({ logo_url: "" }); await saveContent("branding", { logo_url: "" }); }} className="px-4 py-2 border border-border rounded-md font-body text-xs font-bold tracking-wider uppercase hover:bg-muted/30">Reset to Default</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="w-full h-40 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover:border-primary/50 disabled:opacity-50">
+                  {uploadingLogo ? <Loader2 className="w-6 h-6 animate-spin text-primary" /> : <ImageIcon className="w-6 h-6 text-muted-foreground" />}
+                  <span className="font-body text-xs text-muted-foreground">{uploadingLogo ? "Uploading..." : "Upload brand logo (PNG/SVG)"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "coupons" && (
+          <div className="space-y-6 max-w-5xl">
+            <div className="bg-background rounded-xl border border-primary/30 p-6">
+              <h3 className="font-display text-lg font-semibold mb-1">Create Owner's Discount</h3>
+              <p className="font-body text-xs text-muted-foreground mb-5">Custom codes customers can apply at checkout.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div><label className={labelCls}>Code *</label><input className={inputCls + " font-mono uppercase"} placeholder="MISHI20" value={newCoupon.code || ""} onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })} /></div>
+                <div>
+                  <label className={labelCls}>Type</label>
+                  <select className={inputCls} value={newCoupon.discount_type} onChange={(e) => setNewCoupon({ ...newCoupon, discount_type: e.target.value })}>
+                    <option value="percent">Percent (%)</option>
+                    <option value="flat">Flat (₹)</option>
+                  </select>
+                </div>
+                <div><label className={labelCls}>Value *</label><input type="number" className={inputCls} value={newCoupon.discount_value || ""} onChange={(e) => setNewCoupon({ ...newCoupon, discount_value: Number(e.target.value) })} /></div>
+                <div><label className={labelCls}>Min Subtotal (₹)</label><input type="number" className={inputCls} value={newCoupon.min_subtotal || 0} onChange={(e) => setNewCoupon({ ...newCoupon, min_subtotal: Number(e.target.value) })} /></div>
+                <div><label className={labelCls}>Max Uses (blank = ∞)</label><input type="number" className={inputCls} value={newCoupon.max_uses || ""} onChange={(e) => setNewCoupon({ ...newCoupon, max_uses: e.target.value ? Number(e.target.value) : null })} /></div>
+                <div><label className={labelCls}>Expires</label><input type="datetime-local" className={inputCls} value={newCoupon.expires_at || ""} onChange={(e) => setNewCoupon({ ...newCoupon, expires_at: e.target.value })} /></div>
+                <div className="md:col-span-3"><label className={labelCls}>Description (internal)</label><input className={inputCls} value={newCoupon.description || ""} onChange={(e) => setNewCoupon({ ...newCoupon, description: e.target.value })} /></div>
+              </div>
+              <button onClick={saveCoupon} className={btnPrimary + " mt-4"}><Plus className="w-3.5 h-3.5" /> Create Coupon</button>
+            </div>
+
+            <div className="bg-background rounded-xl border border-border/50 overflow-x-auto">
+              <table className="w-full">
+                <thead><tr className="border-b border-border/50 bg-muted/30">
+                  {["Code", "Discount", "Min ₹", "Uses", "Expires", "Status", "Actions"].map(h => <th key={h} className="text-left font-body text-xs font-semibold tracking-wider uppercase text-muted-foreground py-3 px-4">{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {coupons.length === 0 ? <tr><td colSpan={7} className="text-center py-8 font-body text-sm text-muted-foreground">No coupons yet</td></tr> :
+                    coupons.map(c => (
+                      <tr key={c.id} className="border-b border-border/30">
+                        <td className="font-mono text-sm font-bold py-3 px-4">{c.code}</td>
+                        <td className="font-body text-sm py-3 px-4">{c.discount_type === "percent" ? `${c.discount_value}%` : `₹${c.discount_value}`}</td>
+                        <td className="font-body text-sm py-3 px-4">₹{c.min_subtotal}</td>
+                        <td className="font-body text-sm py-3 px-4">{c.used_count}{c.max_uses ? ` / ${c.max_uses}` : ""}</td>
+                        <td className="font-body text-xs text-muted-foreground py-3 px-4">{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "—"}</td>
+                        <td className="py-3 px-4">
+                          <button onClick={() => toggleCoupon(c.id, !c.active)} className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.active ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{c.active ? "Active" : "Inactive"}</button>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button onClick={() => deleteCoupon(c.id)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
 
         {activeTab === "payments" && (
           <div className="space-y-6 max-w-3xl">

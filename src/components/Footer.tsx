@@ -1,7 +1,7 @@
 import { Crown, Instagram, Mail, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import mishiLogo from "@/assets/mishi-logo.jpg";
-import { useSiteContent, type Socials } from "@/hooks/useSiteContent";
+import { useSiteContent, type Socials, type Branding } from "@/hooks/useSiteContent";
 
 const SOCIAL_DEFAULTS: Socials = {
   instagram: "https://instagram.com/mishiofficial1701",
@@ -11,13 +11,15 @@ const SOCIAL_DEFAULTS: Socials = {
 
 const Footer = () => {
   const { content: socials } = useSiteContent<Socials>("socials", SOCIAL_DEFAULTS);
+  const { content: branding } = useSiteContent<Branding>("branding", { logo_url: "" });
+  const logoSrc = branding.logo_url || mishiLogo;
 
   return (
     <footer className="bg-foreground text-background/80 pt-16 pb-8">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-12">
           <div>
-            <img src={mishiLogo} alt="MISHI" className="h-12 w-auto mb-4 brightness-[10]" />
+            <img src={logoSrc} alt="MISHI" className="h-12 w-auto mb-4 brightness-[10] object-contain" />
             <p className="font-body text-sm text-background/50 leading-relaxed">
               Where Love Unites Empires. A legacy of fine jewellery, lab grown diamonds, and premium fashion — built on a sacred promise.
             </p>
